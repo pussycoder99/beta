@@ -15,15 +15,15 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
 
   const formData = new URLSearchParams();
   formData.append('action', action);
-  formData.append('identifier', WHMCS_API_IDENTIFIER);
-  formData.append('secret', WHMCS_API_SECRET);
+  formData.append('identifier', WHMCS_API_IDENTIFIER); // Standard API auth
+  formData.append('secret', WHMCS_API_SECRET);     // Standard API auth
   formData.append('responsetype', 'json');
 
   for (const key in params) {
     formData.append(key, params[key]);
   }
 
-  console.log(`[WHMCS API SERVER DEBUG] Calling action: ${action}`);
+  console.log(`[WHMCS API SERVER DEBUG] Calling action (via callWhmcsApi): ${action}`);
   // console.log(`[WHMCS API SERVER DEBUG] Request URL: ${WHMCS_API_URL}`);
   // console.log(`[WHMCS API SERVER DEBUG] Request FormData (masked secrets): ${formData.toString().replace(WHMCS_API_SECRET, '********')}`);
 
@@ -42,7 +42,6 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
     if (!response.ok) {
       const errorText = rawResponseText || `WHMCS API request failed with status ${response.status}`;
       console.error(`[WHMCS API SERVER ERROR] WHMCS API request failed for action ${action} with status ${response.status}: ${errorText}`);
-      // Try to parse as JSON to see if WHMCS returned a structured error
       try {
         const errorJson = JSON.parse(errorText);
         if (errorJson && errorJson.message) {
@@ -71,24 +70,30 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
   }
 }
 
-export const validateLoginWHMCS = async (email: string, passwordAttempt: string): Promise<{ result: 'success' | 'error'; message?: string; userId?: string }> => {
+export const validateLoginWHMCS = async (email: string, passwordAttempt: string): Promise<{ result: 'success' | 'error'; message?: string; userid?: string, passwordhash?: string, twoFactorEnabled?: boolean }> => {
   const directFormData = new URLSearchParams();
   directFormData.append('action', 'ValidateLogin');
-  directFormData.append('email', email);
-  directFormData.append('password2', passwordAttempt);
+  
+  // Add API authentication parameters as per WHMCS cURL example for ValidateLogin
+  if (WHMCS_API_IDENTIFIER && WHMCS_API_SECRET) {
+    directFormData.append('username', WHMCS_API_IDENTIFIER); // API Identifier for API call authentication
+    directFormData.append('password', WHMCS_API_SECRET);   // API Secret for API call authentication
+  } else {
+    console.warn("[WHMCS API SERVER WARN] Missing WHMCS_API_IDENTIFIER or WHMCS_API_SECRET for ValidateLogin API authentication.");
+    // Depending on WHMCS setup, ValidateLogin might fail without these.
+  }
+  
+  directFormData.append('email', email); // Client's email
+  directFormData.append('password2', passwordAttempt); // Client's password
   directFormData.append('responsetype', 'json');
   
-  // If your WHMCS needs API IDENTIFIER/SECRET even for ValidateLogin, add them here.
-  // However, ValidateLogin typically works by just providing client email and password.
-  // If WHMCS_API_URL itself requires admin auth for any hit, then the global callWhmcsApi pattern might be needed even for this,
-  // but ValidateLogin is often an exception that doesn't use the admin API secret *within its own parameters*.
 
   console.log(`[WHMCS API SERVER DEBUG] Attempting ValidateLogin action (direct)`);
   console.log(`[WHMCS API SERVER DEBUG] Target URL: ${WHMCS_API_URL}`);
   console.log(`[WHMCS API SERVER DEBUG] ValidateLogin FormData to be sent:`);
   for (const [key, value] of directFormData.entries()) {
-    if (key.toLowerCase().includes('password')) {
-      console.log(`  ${key}: ********`); // Mask password in logs
+    if (key.toLowerCase().includes('password') || key.toLowerCase().includes('secret')) {
+      console.log(`  ${key}: ********`); 
     } else {
       console.log(`  ${key}: ${value}`);
     }
@@ -107,7 +112,6 @@ export const validateLoginWHMCS = async (email: string, passwordAttempt: string)
     if (!response.ok) {
         const errorText = rawResponseText || `WHMCS ValidateLogin request failed with status ${response.status}`;
         console.error(`[WHMCS API SERVER ERROR] ValidateLogin request failed: ${errorText}`);
-        // Try to parse as JSON to see if WHMCS returned a structured error
         try {
             const errorJson = JSON.parse(errorText);
             if (errorJson && errorJson.message) {
@@ -122,9 +126,13 @@ export const validateLoginWHMCS = async (email: string, passwordAttempt: string)
     console.log(`[WHMCS API SERVER DEBUG] Parsed Response Data for ValidateLogin (direct):`, data);
 
     if (data.result === 'success' && data.userid) {
-      return { result: 'success', userId: data.userid.toString() };
+      return { 
+        result: 'success', 
+        userid: data.userid.toString(), 
+        passwordhash: data.passwordhash, 
+        twoFactorEnabled: data.twoFactorEnabled === "true" || data.twoFactorEnabled === true 
+      };
     }
-    // Ensure a message is returned even if WHMCS doesn't provide one
     return { result: 'error', message: data.message || 'Authentication failed: Unknown reason from WHMCS.' };
   } catch (error: any) {
     console.error("[WHMCS API SERVER CATCH ERROR] ValidateLogin API error:", error.message);
@@ -144,9 +152,10 @@ export const addClientWHMCS = async (clientData: Omit<User, 'id'> & {password?: 
       city: clientData.city || '',
       state: clientData.state || '',
       postcode: clientData.postcode || '',
-      country: clientData.country || '', // WHMCS expects country code (e.g., US, GB)
+      country: clientData.country || '', 
       phonenumber: clientData.phoneNumber || '',
     };
+    // addClientWHMCS uses callWhmcsApi, which already includes identifier & secret
     const data = await callWhmcsApi('AddClient', params);
     if (data.result === 'success' && data.clientid) {
       return { result: 'success', userId: data.clientid.toString() };
@@ -159,8 +168,9 @@ export const addClientWHMCS = async (clientData: Omit<User, 'id'> & {password?: 
 
 export const getUserDetailsWHMCS = async (userId: string): Promise<{ user?: User, whmcsData?: any }> => {
   try {
+    // getUserDetailsWHMCS uses callWhmcsApi, which already includes identifier & secret
     const data = await callWhmcsApi('GetClientsDetails', { clientid: userId, stats: false });
-    if (data.result === 'success' && data.client) { // WHMCS often nests user details under 'client'
+    if (data.result === 'success' && data.client) { 
       const client = data.client;
       const user: User = {
         id: client.id?.toString() || client.userid?.toString() || client.clientid?.toString() || userId,
@@ -172,7 +182,7 @@ export const getUserDetailsWHMCS = async (userId: string): Promise<{ user?: User
         city: client.city,
         state: client.state,
         postcode: client.postcode,
-        country: client.countrycode || client.country, // Prefer countrycode
+        country: client.countrycode || client.country, 
         phoneNumber: client.phonenumber || client.telephone,
       };
       return { user, whmcsData: client };
@@ -188,7 +198,7 @@ export const getUserDetailsWHMCS = async (userId: string): Promise<{ user?: User
 
 export const getClientsProductsWHMCS = async (userId: string): Promise<{ services: Service[], whmcsData?: any }> => {
   try {
-    const data = await callWhmcsApi('GetClientsProducts', { clientid: userId, stats: false }); // stats:false is often cleaner
+    const data = await callWhmcsApi('GetClientsProducts', { clientid: userId, stats: false }); 
     let services: Service[] = [];
     
     if (data.result === 'success' && data.products?.product) {
@@ -197,14 +207,13 @@ export const getClientsProductsWHMCS = async (userId: string): Promise<{ service
       
       services = productsArray.map((p: any) => ({
           id: p.id.toString(),
-          name: p.name || p.productinfo?.name || p.productname, // WHMCS uses 'name' for service display name, 'productname' for package name
+          name: p.name || p.productinfo?.name || p.productname, 
           status: p.status as ServiceStatus, 
           registrationDate: p.regdate,
           nextDueDate: p.nextduedate,
           billingCycle: p.billingcycle,
           amount: `${p.currencyprefix || currency.prefix}${p.recurringamount} ${p.currencycode || currency.code}`,
           domain: p.domain,
-          // serverInfo: (p.serverip && p.serverhostname) ? { hostname: p.serverhostname, ipAddress: p.serverip } : undefined,
       }));
     } else if (data.result !== 'success') {
         console.warn(`[WHMCS API SERVER WARN] GetClientsProducts for user ${userId} API call failed. Data:`, data);
@@ -226,12 +235,12 @@ export const getDomainsWHMCS = async (userId: string): Promise<{ domains: Domain
       const domainsArray = Array.isArray(data.domains.domain) ? data.domains.domain : [data.domains.domain];
       domains = domainsArray.map((d: any) => ({
           id: d.id.toString(),
-          domainName: d.domain, // WHMCS often uses 'domain' for the domain name itself
+          domainName: d.domain, 
           status: d.status as DomainStatus,
           registrationDate: d.regdate || d.registrationdate,
-          expiryDate: d.nextduedate || d.expirydate, // nextduedate is often the renewal date for domains
+          expiryDate: d.nextduedate || d.expirydate, 
           registrar: d.registrar,
-          nameservers: [d.ns1, d.ns2, d.ns3, d.ns4, d.ns5].filter(Boolean) // WHMCS uses ns1, ns2, etc.
+          nameservers: [d.ns1, d.ns2, d.ns3, d.ns4, d.ns5].filter(Boolean) 
       }));
     } else if (data.result !== 'success') {
         console.warn(`[WHMCS API SERVER WARN] GetClientsDomains for user ${userId} API call failed. Data:`, data);
@@ -248,10 +257,10 @@ export const getDomainsWHMCS = async (userId: string): Promise<{ domains: Domain
 export const getInvoicesWHMCS = async (userId: string, statusFilter?: InvoiceStatus, limit: number = 50): Promise<{ invoices: Invoice[], whmcsData?: any }> => {
   try {
     const params: Record<string, any> = { userid: userId, limitnum: limit, orderby: 'duedate', order: 'DESC' };
-    if (statusFilter && statusFilter !== "Overdue") { // WHMCS 'Overdue' status might be special, handle if needed or use default 'Unpaid' for it
+    if (statusFilter && statusFilter !== "Overdue") { 
         params.status = statusFilter;
     } else if (statusFilter === "Overdue") {
-        params.status = "Unpaid"; // Overdue invoices are typically a subset of Unpaid
+        params.status = "Unpaid"; 
     }
     
     const invData = await callWhmcsApi('GetInvoices', params);
@@ -259,7 +268,7 @@ export const getInvoicesWHMCS = async (userId: string, statusFilter?: InvoiceSta
     let invoices: Invoice[] = [];
     
     if (invData.result === 'success' && invData.invoices?.invoice) {
-      const defaultCurrency = { code: 'USD', suffix: 'USD', prefix: '$' }; // Fallback
+      const defaultCurrency = { code: 'USD', suffix: 'USD', prefix: '$' }; 
       const currency = invData.currency || defaultCurrency;
       const invoicesArray = Array.isArray(invData.invoices.invoice) ? invData.invoices.invoice : [invData.invoices.invoice];
       invoices = invoicesArray.map((inv: any) => ({
@@ -268,7 +277,7 @@ export const getInvoicesWHMCS = async (userId: string, statusFilter?: InvoiceSta
           dateCreated: inv.date,
           dueDate: inv.duedate,
           total: `${inv.currencyprefix || currency.prefix}${inv.total} ${inv.currencycode || currency.code}`,
-          status: inv.status as InvoiceStatus, // Ensure this matches your type's possible values
+          status: inv.status as InvoiceStatus, 
           items: inv.items?.item ? 
                  (Array.isArray(inv.items.item) ? inv.items.item : [inv.items.item]).map((it: any) => ({
                     description: it.description,
@@ -290,17 +299,12 @@ export const getInvoicesWHMCS = async (userId: string, statusFilter?: InvoiceSta
 export const getTicketsWHMCS = async (userId: string, statusFilter: string = 'All Active'): Promise<{ tickets: Ticket[], whmcsData?: any }> => {
   try {
     const params: Record<string, any> = { clientid: userId, limitnum: 50 };
-    // WHMCS API status filter: 'Open', 'Answered', 'Customer-Reply', 'Closed', 'In Progress'.
-    // 'All Active' is not a direct WHMCS filter value. You might need multiple calls or broader filter.
-    // For simplicity, let's try 'Open' or remove status filter to get more if 'All Active' doesn't work.
-    // Or, let user pass specific WHMCS statuses.
     if (statusFilter && statusFilter !== 'All Active' && statusFilter !== 'All') {
         params.status = statusFilter;
     } else if (statusFilter === 'All Active') {
-        params.status_custom_operator = 'OR'; // This is a guess, check WHMCS docs
-        params.status = 'Open,Answered,Customer-Reply,In Progress'; // WHMCS might take comma-separated list
+        params.status_custom_operator = 'OR'; 
+        params.status = 'Open,Answered,Customer-Reply,In Progress'; 
     }
-
 
     const data = await callWhmcsApi('GetTickets', params);
     let tickets: Ticket[] = [];
@@ -312,7 +316,7 @@ export const getTicketsWHMCS = async (userId: string, statusFilter: string = 'Al
             subject: t.subject,
             department: t.deptname || t.departmentname,
             status: t.status as TicketStatus,
-            lastUpdated: t.lastreply.includes('0000-00-00') ? t.date : t.lastreply, // WHMCS returns "0000-00-00 00:00:00" if no reply
+            lastUpdated: t.lastreply.includes('0000-00-00') ? t.date : t.lastreply, 
             dateOpened: t.date,
             priority: t.priority as 'Low' | 'Medium' | 'High',
         }));
@@ -338,7 +342,6 @@ export const getTicketByIdWHMCS = async (ticketId: string): Promise<{ ticket?: T
       
       const replies: TicketReply[] = repliesData.map((r: any) => ({
           id: r.replyid?.toString() || r.id?.toString() || `reply-${Math.random().toString(36).substr(2, 9)}`,
-          // WHMCS uses 'userid' (0 for staff) and 'admin' field for staff name.
           author: (r.userid && r.userid.toString() === '0') || r.admin || r.name === 'System' || (r.requestor_type === 'staff' || r.requestor_type === 'api') ? 'Support Staff' : 'Client',
           message: r.message,
           date: r.date,
@@ -366,8 +369,6 @@ export const getTicketByIdWHMCS = async (ticketId: string): Promise<{ ticket?: T
   }
 };
 
-// Note: For OpenTicket, deptid should be the ID of the department, not its name.
-// You might need a helper function or a map to convert department names to IDs if your UI uses names.
 export const openTicketWHMCS = async (ticketData: { clientid: string, deptid: string; subject: string; message: string; priority: 'Low' | 'Medium' | 'High'; serviceid?: string }): Promise<{ result: 'success' | 'error'; message?: string; ticketId?: string; ticketNumber?: string }> => {
   try {
     const params = {
@@ -377,7 +378,6 @@ export const openTicketWHMCS = async (ticketData: { clientid: string, deptid: st
       message: ticketData.message,
       priority: ticketData.priority,
       ...(ticketData.serviceid && { serviceid: ticketData.serviceid }),
-      // You can also add other params like 'contactid', 'name', 'email' if not relying on clientid context
     };
     
     const data = await callWhmcsApi('OpenTicket', params);
@@ -390,7 +390,7 @@ export const openTicketWHMCS = async (ticketData: { clientid: string, deptid: st
   }
 };
 
-export const replyToTicketWHMCS = async (replyData: { ticketid: string, message: string, clientid?: string, adminusername?: string /* for admin replies */ }): Promise<{ result: 'success' | 'error'; message?: string; reply?: TicketReply }> => {
+export const replyToTicketWHMCS = async (replyData: { ticketid: string, message: string, clientid?: string, adminusername?: string }): Promise<{ result: 'success' | 'error'; message?: string; reply?: TicketReply }> => {
   try {
     const params: Record<string, any> = {
       ticketid: replyData.ticketid, 
@@ -398,22 +398,17 @@ export const replyToTicketWHMCS = async (replyData: { ticketid: string, message:
     };
     if (replyData.clientid) {
         params.clientid = replyData.clientid;
-        // If client is replying, WHMCS might also want 'name' and 'email' if not inferring from clientid
-        // params.name = "Client Name"; // Needs to be fetched or passed
-        // params.email = "client.email@example.com"; // Needs to be fetched or passed
     } else if (replyData.adminusername) {
         params.adminusername = replyData.adminusername;
     }
     
     const data = await callWhmcsApi('AddTicketReply', params);
     if (data.result === 'success') {
-      // WHMCS AddTicketReply usually just returns {result: "success"}. 
-      // We construct a temporary reply object for immediate UI update.
       const newReply: TicketReply = { 
-        id: `temp-reply-${Date.now()}-${Math.random().toString(16).slice(2)}`, // Placeholder ID
+        id: `temp-reply-${Date.now()}-${Math.random().toString(16).slice(2)}`, 
         author: replyData.clientid ? 'Client' : 'Support Staff',
         message: replyData.message,
-        date: format(new Date(), 'yyyy-MM-dd HH:mm:ss'), // Current time as placeholder
+        date: format(new Date(), 'yyyy-MM-dd HH:mm:ss'), 
       };
       return { result: 'success', reply: newReply };
     }

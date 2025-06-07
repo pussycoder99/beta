@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { validateLoginWHMCS, getUserDetailsWHMCS } from '@/lib/whmcs-mock-api'; // Now using WHMCS direct functions
+import { validateLoginWHMCS, getUserDetailsWHMCS } from '@/lib/whmcs-mock-api'; 
 
 export async function POST(request: Request) {
   try {
@@ -12,30 +12,39 @@ export async function POST(request: Request) {
 
     const loginResponse = await validateLoginWHMCS(email, password);
 
-    if (loginResponse.result === 'success' && loginResponse.userId) {
+    if (loginResponse.result === 'success' && loginResponse.userid) {
       // Successfully validated with WHMCS, now fetch user details
-      const userDetailsResponse = await getUserDetailsWHMCS(loginResponse.userId);
+      const userDetailsResponse = await getUserDetailsWHMCS(loginResponse.userid); // Use userid from loginResponse
       if (userDetailsResponse.user) {
         // In a real app, you'd generate a proper session token (e.g., JWT) here
-        // For now, we'll return user details and a placeholder token structure
-        const placeholderToken = `mock-jwt-token-for-${loginResponse.userId}`;
+        // Or use the passwordhash from loginResponse if needed for WHMCS session integration
+        const placeholderToken = `whmcs-session-for-${loginResponse.userid}`;
         return NextResponse.json({ 
           user: userDetailsResponse.user, 
-          token: placeholderToken,
+          token: placeholderToken, // This is our app's session token, not directly from WHMCS API login
           message: 'Login successful' 
         });
       } else {
-        // This case should ideally not happen if ValidateLogin succeeded with a userId
         return NextResponse.json({ message: 'User details not found after login.' }, { status: 500 });
       }
     } else {
-      return NextResponse.json({ message: loginResponse.message || 'Invalid credentials' }, { status: 401 });
+      // If loginResponse contains a message, use it, otherwise provide a generic one
+      return NextResponse.json({ message: loginResponse.message || 'Invalid credentials or unknown API error' }, { status: 401 });
     }
   } catch (error) {
     console.error('[API LOGIN ERROR]', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
+    let errorMessage = 'An unexpected error occurred during login.';
+    if (error instanceof Error) {
+        errorMessage = error.message;
+    }
+    try {
+      const parsedError = JSON.parse(errorMessage);
+      if (parsedError && parsedError.message) {
+        errorMessage = parsedError.message;
+      }
+    } catch (e) {
+      // not a JSON string
+    }
     return NextResponse.json({ message: `Login failed: ${errorMessage}` }, { status: 500 });
   }
 }
-
-    
