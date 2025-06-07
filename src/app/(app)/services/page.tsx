@@ -8,9 +8,10 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowUpCircle, RefreshCw, Server, XCircle, Eye, PlusCircle, Loader2 } from 'lucide-react';
+import { ArrowUpCircle, RefreshCw, Server, XCircle, Eye, PlusCircle, Loader2, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 const StatusBadge = ({ status }: { status: Service['status'] }) => {
   switch (status) {
@@ -34,6 +35,7 @@ export default function ServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const router = useRouter(); // Initialize useRouter
 
   useEffect(() => {
     if (user?.id && token) { 
@@ -75,10 +77,25 @@ export default function ServicesPage() {
     }
   }, [user?.id, token, toast]); 
 
-  const handleOtherAction = (serviceId: string, action: string) => {
-    // Mock action - In a real app, these would likely be API calls too
-    toast({ title: 'Action Triggered', description: `${action} for service ${serviceId} (mocked).`});
+  const handleRenew = (serviceId: string) => {
+    // Navigate to billing page
+    router.push('/billing');
+    toast({ title: 'Renew Service', description: `Redirecting to billing for service ${serviceId}.`});
   };
+
+  const handleUpgrade = (serviceId: string) => {
+    // Navigate to the new order/upgrade page
+    router.push('/services/order'); 
+    // Optionally, you could pass the serviceId if the upgrade page needs it:
+    // router.push(`/services/order?serviceId=${serviceId}`);
+    toast({ title: 'Upgrade Service', description: `Loading available upgrades/new services.`});
+  };
+
+  const handleCancelRequest = (serviceId: string) => {
+    // Mock action - In a real app, these would likely be API calls too
+    toast({ title: 'Action Triggered', description: `Cancel request for service ${serviceId} (mocked).`});
+  };
+
 
   if (isLoading) {
     return (
@@ -101,8 +118,8 @@ export default function ServicesPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold text-foreground">Your Services</h1>
         <Button asChild>
-          <Link href="/services/order"> {/* This would be a link to a new order page */}
-            <PlusCircle className="mr-2 h-4 w-4" /> Order New Service
+          <Link href="/services/order">
+            <ShoppingCart className="mr-2 h-4 w-4" /> Order New Service
           </Link>
         </Button>
       </div>
@@ -151,13 +168,13 @@ export default function ServicesPage() {
                       </Button>
                       {service.status === 'Active' && (
                         <>
-                          <Button variant="ghost" size="icon" title="Renew" onClick={() => handleOtherAction(service.id, 'Renew')}>
+                          <Button variant="ghost" size="icon" title="Renew" onClick={() => handleRenew(service.id)}>
                             <RefreshCw className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" title="Upgrade" onClick={() => handleOtherAction(service.id, 'Upgrade')}>
+                          <Button variant="ghost" size="icon" title="Upgrade" onClick={() => handleUpgrade(service.id)}>
                             <ArrowUpCircle className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" title="Cancel" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90" onClick={() => handleOtherAction(service.id, 'Cancel Request')}>
+                          <Button variant="ghost" size="icon" title="Cancel" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90" onClick={() => handleCancelRequest(service.id)}>
                             <XCircle className="h-4 w-4" />
                           </Button>
                         </>
@@ -173,4 +190,3 @@ export default function ServicesPage() {
     </div>
   );
 }
-

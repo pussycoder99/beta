@@ -88,3 +88,60 @@ export interface Ticket {
   replies?: TicketReply[];
 }
 
+export interface ProductGroup {
+  id: string;
+  name: string;
+  headline?: string;
+  tagline?: string;
+  order: number;
+  // Add other fields as returned by WHMCS GetProductGroups
+}
+
+// Represents the pricing for a single currency and cycle
+export interface ProductPrice {
+  cycle: string; // e.g., 'monthly', 'annually', 'biennially'
+  price: string; // e.g., "10.00"
+  setupfee: string; // e.g., "0.00"
+}
+
+// Pricing details for a product, keyed by currency code
+export interface ProductPricing {
+  [currencyCode: string]: {
+    prefix: string;
+    suffix: string;
+    msetupfee: string;
+    qsetupfee: string;
+    ssetupfee: string;
+    asetupfee: string;
+    bsetupfee: string;
+    tsetupfee: string;
+    monthly: string;
+    quarterly: string;
+    semiannually: string;
+    annually: string;
+    biennially: string;
+    triennially: string;
+  };
+}
+
+export interface ProductFeature {
+  [featureName: string]: string; // WHMCS often returns features as key-value pairs
+}
+
+
+export interface Product {
+  pid: string;
+  gid: string;
+  type: string; // e.g., 'hostingaccount', 'reselleraccount', 'server', 'other'
+  name: string;
+  description: string; // HTML content
+  module: string; // Server module, e.g., 'cpanel', 'plesk'
+  paytype: 'free' | 'onetime' | 'recurring';
+  pricing: ProductPricing; // Complex object, see WHMCS GetProducts API response
+  features?: ProductFeature; // Features array/object from WHMCS (e.g. disk space, bandwidth)
+  // Store a more structured simple price for display
+  displayPrice?: string; // e.g., "$10.00/month"
+  featureDescription?: string[]; // Parsed features for easier display
+  // Add other fields as needed from WHMCS GetProducts response
+  // e.g., hidden, showdomainoptions, welcomeemail, stockcontrol, qty, etc.
+}

@@ -1,6 +1,5 @@
 
-
-import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus } from '@/types';
+import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, ProductFeature } from '@/types';
 import { format } from 'date-fns';
 
 const WHMCS_API_URL = process.env.NEXT_PUBLIC_WHMCS_API_URL;
@@ -24,16 +23,14 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
     formData.append(key, params[key]);
   }
 
-  console.log(`[WHMCS API SERVER DEBUG] Calling action (via callWhmcsApi): ${action}`);
-  // console.log(`[WHMCS API SERVER DEBUG] Request URL: ${WHMCS_API_URL}`);
-  // console.log(`[WHMCS API SERVER DEBUG] Request FormData (masked secrets): ${formData.toString().replace(WHMCS_API_SECRET, '********')}`);
+  console.log(`[WHMCS API SERVER DEBUG] Calling action (via callWhmcsApi): ${action} with params:`, JSON.stringify(params));
 
 
   try {
     const response = await fetch(WHMCS_API_URL, {
       method: 'POST',
       body: formData,
-      cache: 'no-store', // Ensure fresh data
+      cache: 'no-store', 
     });
 
     const rawResponseText = await response.text();
@@ -56,7 +53,7 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
     const data = JSON.parse(rawResponseText);
     // console.log(`[WHMCS API SERVER DEBUG] Parsed Response Data for ${action}:`, data);
     
-    if (data.result === 'error' && action !== 'ValidateLogin') { // ValidateLogin handles its own specific error structure
+    if (data.result === 'error' && action !== 'ValidateLogin') { 
       console.error(`[WHMCS API SERVER ERROR] WHMCS API Error for action ${action}:`, data.message);
       throw new Error(data.message || `WHMCS API error for action ${action}.`);
     }
@@ -74,10 +71,9 @@ export const validateLoginWHMCS = async (email: string, passwordAttempt: string)
   const directFormData = new URLSearchParams();
   directFormData.append('action', 'ValidateLogin');
   
-  // ValidateLogin requires API auth creds in the POST body directly, as per WHMCS docs
   if (WHMCS_API_IDENTIFIER && WHMCS_API_SECRET) {
-    directFormData.append('username', WHMCS_API_IDENTIFIER); // API Identifier for API call authentication
-    directFormData.append('password', WHMCS_API_SECRET);   // API Secret for API call authentication
+    directFormData.append('username', WHMCS_API_IDENTIFIER); 
+    directFormData.append('password', WHMCS_API_SECRET);   
   } else {
     console.warn("[WHMCS API SERVER WARN] Missing WHMCS_API_IDENTIFIER or WHMCS_API_SECRET for ValidateLogin API authentication.");
     return { result: 'error', message: 'Server API credentials not configured for ValidateLogin.' };
@@ -133,7 +129,6 @@ export const validateLoginWHMCS = async (email: string, passwordAttempt: string)
         twoFactorEnabled: data.twoFactorEnabled === "true" || data.twoFactorEnabled === true 
       };
     }
-    // If not success, or userid is missing, return the message from WHMCS or a default
     return { result: 'error', message: data.message || 'Authentication failed: Unknown reason from WHMCS.' };
   } catch (error: any) {
     console.error("[WHMCS API SERVER CATCH ERROR] ValidateLogin API error:", error.message);
@@ -197,7 +192,7 @@ export const getUserDetailsWHMCS = async (userId: string): Promise<{ user?: User
 
 export const getClientsProductsWHMCS = async (userId: string, serviceId?: string): Promise<{ services: Service[], whmcsData?: any }> => {
   try {
-    const params: Record<string, any> = { clientid: userId, stats: true }; // stats: true might return usage
+    const params: Record<string, any> = { clientid: userId, stats: true }; 
     if (serviceId) {
       params.serviceid = serviceId;
     }
@@ -217,17 +212,15 @@ export const getClientsProductsWHMCS = async (userId: string, serviceId?: string
           billingCycle: p.billingcycle,
           amount: `${p.currencyprefix || currency.prefix}${p.recurringamount} ${p.currencycode || currency.code}`,
           domain: p.domain,
-          // Usage data (might not always be present, depends on server module)
           diskusage: p.diskusage,
           disklimit: p.disklimit,
           bwusage: p.bwusage,
           bwlimit: p.bwlimit,
-          lastupdate: p.lastupdate, // For usage stats "last updated" time
-          serverInfo: { // Example, might need more fields based on 'p' object
+          lastupdate: p.lastupdate, 
+          serverInfo: { 
             hostname: p.serverhostname,
             ipAddress: p.serverip,
           },
-          // Control panel username, potentially useful for SSO or display
           username: p.username 
       }));
     } else if (data.result !== 'success') {
@@ -316,24 +309,7 @@ export const getTicketsWHMCS = async (userId: string, statusFilter: string = 'Al
     const params: Record<string, any> = { clientid: userId, limitnum: 50 };
     if (statusFilter && statusFilter !== 'All Active' && statusFilter !== 'All') {
         params.status = statusFilter;
-    } else if (statusFilter === 'All Active') {
-        // For 'All Active', WHMCS API might need specific statuses listed or a custom filter if available.
-        // Commonly, active tickets are Open, Answered, Customer-Reply, In Progress.
-        // The API docs should specify how to filter for multiple statuses if supported.
-        // If not, you might fetch all and filter client-side, or make multiple calls.
-        // For now, let's assume 'Open' is a primary active status for simplicity if 'All Active' is not a direct filter.
-        // A more robust approach might be needed based on WHMCS API capabilities for multi-status filtering.
-        // params.status_custom_operator = 'OR'; // This is a guess, check WHMCS docs
-        // params.status = 'Open,Answered,Customer-Reply,In Progress'; // Example if comma-separated list is supported
-        // WHMCS API often defaults to "active" tickets if no status is specified,
-        // or specific statuses need to be OR'd if the API allows complex queries.
-        // For simplicity, if 'All Active' is requested, we might just omit the status filter to get WHMCS default active tickets,
-        // or explicitly list typical active statuses if the API supports comma-separated lists for 'status'.
-        // The WHMCS 'GetTickets' API typically returns tickets that aren't 'Closed' by default or with simple 'Open' type filters.
-        // Let's try fetching without a specific status filter for "All Active" and rely on WHMCS behavior, or use a common active status.
-        // We can refine this if the results aren't as expected.
-    }
-
+    } 
     const data = await callWhmcsApi('GetTickets', params);
     let tickets: Ticket[] = [];
     if (data.result === 'success' && data.tickets?.ticket) {
@@ -348,7 +324,6 @@ export const getTicketsWHMCS = async (userId: string, statusFilter: string = 'Al
             dateOpened: t.date,
             priority: t.priority as 'Low' | 'Medium' | 'High',
         }));
-         // If "All Active" was requested and we didn't filter by specific active statuses via API, filter here.
         if (statusFilter === 'All Active') {
           const activeStatuses: TicketStatus[] = ['Open', 'Answered', 'Customer-Reply', 'In Progress', 'On Hold'];
           tickets = tickets.filter(ticket => activeStatuses.includes(ticket.status));
@@ -375,7 +350,7 @@ export const getTicketByIdWHMCS = async (ticketId: string): Promise<{ ticket?: T
         (Array.isArray(data.replies.reply) ? data.replies.reply : [data.replies.reply]) : [];
       
       const replies: TicketReply[] = repliesData.map((r: any) => ({
-          id: r.replyid?.toString() || r.id?.toString() || `reply-${Math.random().toString(36).substr(2, 9)}`, // Ensure unique ID
+          id: r.replyid?.toString() || r.id?.toString() || `reply-${Math.random().toString(36).substr(2, 9)}`, 
           author: (r.userid && r.userid.toString() === '0') || r.admin || r.name === 'System' || (r.requestor_type === 'staff' || r.requestor_type === 'api') ? 'Support Staff' : 'Client',
           message: r.message,
           date: r.date,
@@ -403,11 +378,25 @@ export const getTicketByIdWHMCS = async (ticketId: string): Promise<{ ticket?: T
   }
 };
 
-export const openTicketWHMCS = async (ticketData: { clientid: string, deptid: string; subject: string; message: string; priority: 'Low' | 'Medium' | 'High'; serviceid?: string }): Promise<{ result: 'success' | 'error'; message?: string; ticketId?: string; ticketNumber?: string }> => {
+// Mapping for department names to IDs - this is an example.
+// You'll need to get the actual IDs from your WHMCS setup (Setup > Support > Support Departments)
+const departmentNameToIdMap: Record<string, string> = {
+  "Technical Support": "1",
+  "Billing": "2",
+  "Sales": "3",
+  "General Inquiry": "4", 
+};
+
+export const openTicketWHMCS = async (ticketData: { clientid: string, deptname: string; subject: string; message: string; priority: 'Low' | 'Medium' | 'High'; serviceid?: string }): Promise<{ result: 'success' | 'error'; message?: string; ticketId?: string; ticketNumber?: string }> => {
   try {
+    const deptid = departmentNameToIdMap[ticketData.deptname];
+    if (!deptid) {
+      return { result: 'error', message: `Invalid department name: ${ticketData.deptname}. Could not map to department ID.` };
+    }
+
     const params = {
       clientid: ticketData.clientid,
-      deptid: ticketData.deptid, 
+      deptid: deptid, 
       subject: ticketData.subject,
       message: ticketData.message,
       priority: ticketData.priority,
@@ -480,25 +469,22 @@ export const createSsoTokenWHMCS = async (
 export const addFundsWHMCS = async (
   userId: string, 
   amount: number, 
-  paymentMethodGateway: string // e.g., "paypal", "stripe"
+  paymentMethodGateway: string 
 ): Promise<{ result: 'success' | 'error'; message?: string; invoiceId?: string; paymentUrl?: string }> => {
   try {
     const invoiceParams = {
       clientid: userId,
-      status: 'Unpaid', // The invoice needs to be paid to add funds
-      sendinvoice: true, // Optionally send invoice email to client
+      status: 'Unpaid', 
+      sendinvoice: true, 
       paymentmethod: paymentMethodGateway,
       itemdescription1: `Add Funds - ${new Date().toISOString().split('T')[0]}`,
       itemamount1: amount.toFixed(2),
-      itemtaxed1: 0, // Assuming funds added are not taxed, or tax setup handles this
-      // Might need 'applycredit: 0' if there are other credit handling specifics
+      itemtaxed1: 0, 
     };
 
     const invoiceData = await callWhmcsApi('AddInvoice', invoiceParams);
 
     if (invoiceData.result === 'success' && invoiceData.invoiceid) {
-      // Construct the payment URL. This might vary based on WHMCS version / setup.
-      // It's generally the invoice view page where payment options are presented.
       const paymentUrl = `${process.env.NEXT_PUBLIC_WHMCS_APP_URL || WHMCS_API_URL?.replace('/includes/api.php', '')}/viewinvoice.php?id=${invoiceData.invoiceid}`;
       return { 
         result: 'success', 
@@ -513,14 +499,125 @@ export const addFundsWHMCS = async (
   }
 };
 
+export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[], whmcsData?: any }> => {
+  try {
+    const data = await callWhmcsApi('GetProductGroups', { }); // No specific params needed for all groups usually
+    let groups: ProductGroup[] = [];
+    if (data.result === 'success' && data.groups?.group) {
+      const groupsArray = Array.isArray(data.groups.group) ? data.groups.group : [data.groups.group];
+      groups = groupsArray.map((g: any) => ({
+        id: g.id.toString(),
+        name: g.name,
+        headline: g.headline,
+        tagline: g.tagline,
+        order: parseInt(g.order, 10) || 0,
+      })).sort((a,b) => a.order - b.order);
+    } else if (data.result !== 'success') {
+      console.warn(`[WHMCS API SERVER WARN] GetProductGroups API call failed. Data:`, data);
+    } else {
+      console.log(`[WHMCS API SERVER INFO] No product groups found. Data:`, data);
+    }
+    return { groups, whmcsData: data };
+  } catch (error) {
+    console.error("[WHMCS API SERVER CATCH ERROR] Failed to fetch product groups:", error);
+    return { groups: [] };
+  }
+};
 
 
-// Mock API calls for pages that still directly import them (should be phased out)
-// These direct API calls are only for client-side components that haven't been
-// refactored to use internal Next.js API routes yet.
-// Ideally, all WHMCS interactions should go through your Next.js backend API routes for security and consistency.
+// Helper to extract a simple display price (e.g., monthly)
+const getDisplayPrice = (pricing: ProductPricing, currencyCode: string = 'USD'): string => {
+  const currencyPricing = pricing[currencyCode];
+  if (!currencyPricing) return "N/A";
 
-// For BillingPage:
+  // Prioritize monthly, then quarterly, then annually, etc.
+  const cycles = ['monthly', 'quarterly', 'annually', 'biennially', 'triennially'];
+  let displayPrice = "N/A";
+  let cycleName = "";
+
+  for (const cycle of cycles) {
+    if (currencyPricing[cycle as keyof typeof currencyPricing] && parseFloat(currencyPricing[cycle as keyof typeof currencyPricing] as string) >= 0) {
+      // Check if it's a valid price (not -1.00 which WHMCS uses for "not available")
+      const priceValue = parseFloat(currencyPricing[cycle as keyof typeof currencyPricing] as string);
+      if (priceValue >= 0) {
+         displayPrice = `${currencyPricing.prefix}${priceValue.toFixed(2)}`;
+         cycleName = cycle.charAt(0).toUpperCase() + cycle.slice(1);
+         if (cycle === 'monthly') cycleName = "/mo";
+         else if (cycle === 'annually') cycleName = "/yr";
+         else if (cycle === 'quarterly') cycleName = "/qtr";
+         // Add more abbreviations if needed
+         break;
+      }
+    }
+  }
+  return displayPrice !== "N/A" ? `${displayPrice} ${currencyPricing.suffix} ${cycleName}` : "Contact Us";
+};
+
+
+// Helper to parse features
+const parseFeatures = (features: any): ProductFeature | undefined => {
+    if (!features) return undefined;
+    if (Array.isArray(features.feature)) { // When features are an array of {name: string, value: string}
+        const parsed: ProductFeature = {};
+        features.feature.forEach((f: {name: string, value: string}) => {
+            parsed[f.name] = f.value;
+        });
+        return parsed;
+    }
+    if (typeof features === 'object' && !Array.isArray(features)) { // When features is an object of key-value pairs
+        return features as ProductFeature;
+    }
+    return undefined;
+};
+
+
+export const getProductsWHMCS = async (gid?: string): Promise<{ products: Product[], whmcsData?: any }> => {
+  try {
+    const params: Record<string, any> = { include_features: true };
+    if (gid) {
+      params.gid = gid;
+    }
+    const data = await callWhmcsApi('GetProducts', params);
+    let products: Product[] = [];
+
+    if (data.result === 'success' && data.products?.product) {
+      const productsArray = Array.isArray(data.products.product) ? data.products.product : [data.products.product];
+      products = productsArray.map((p: any) => {
+        const pricing = p.pricing as ProductPricing;
+        const features = parseFeatures(p.features);
+        const featureDescription = features 
+          ? Object.entries(features).map(([key, value]) => `${key}: ${value}`) 
+          : [];
+
+        return {
+          pid: p.pid.toString(),
+          gid: p.gid.toString(),
+          type: p.type,
+          name: p.name,
+          description: p.description, // HTML
+          module: p.module,
+          paytype: p.paytype,
+          pricing: pricing,
+          features: features,
+          displayPrice: getDisplayPrice(pricing), // Use a primary currency like USD by default
+          featureDescription: featureDescription,
+        };
+      });
+    } else if (data.result !== 'success') {
+      console.warn(`[WHMCS API SERVER WARN] GetProducts API call ${gid ? `for GID ${gid}` : ''} failed. Data:`, data);
+    } else {
+      console.log(`[WHMCS API SERVER INFO] No products found ${gid ? `for GID ${gid}` : ''}. Data:`, data);
+    }
+    return { products, whmcsData: data };
+  } catch (error) {
+    console.error("[WHMCS API SERVER CATCH ERROR] Failed to fetch products:", error);
+    return { products: [] };
+  }
+};
+
+// --- Functions below are legacy and mainly for pages that might still directly import them ---
+// --- These should be refactored to use the Next.js API routes for secure credential handling ---
+
 export const getInvoicesAPI = async (userId: string, token?: string) => {
   if (!token) throw new Error("Auth token required for getInvoicesAPI");
   const response = await fetch('/api/data/invoices', { headers: { 'Authorization': `Bearer ${token}` }});
@@ -531,7 +628,6 @@ export const getInvoicesAPI = async (userId: string, token?: string) => {
   return response.json();
 };
 
-// For Support Pages:
 export const getTicketsAPI = async (userId: string, token?: string) => {
   if (!token) throw new Error("Auth token required for getTicketsAPI");
   const response = await fetch('/api/data/tickets', { headers: { 'Authorization': `Bearer ${token}` }});
@@ -543,8 +639,6 @@ export const getTicketsAPI = async (userId: string, token?: string) => {
 };
 
 export const getTicketByIdAPI = async (ticketId: string, token?: string) => {
-  // This client-side direct call assumes ticketId is enough and auth is handled by the API route.
-  // The Next.js API route /api/data/ticket-details/[ticketId] would handle auth.
   if (!token) throw new Error("Auth token required for getTicketByIdAPI");
    const response = await fetch(`/api/data/ticket-details/${ticketId}`, { headers: { 'Authorization': `Bearer ${token}` }});
    if (!response.ok) {
@@ -552,8 +646,6 @@ export const getTicketByIdAPI = async (ticketId: string, token?: string) => {
     throw new Error(err.message || 'Failed to fetch ticket details');
   }
   return response.json();
-  // Fallback if called without token, which shouldn't happen if pages are correctly using useAuth
-  // return getTicketByIdWHMCS(ticketId); // Original mock call
 };
 
 
@@ -562,26 +654,21 @@ export const replyToTicketAPI = async (userId: string, ticketId: string, message
    const response = await fetch(`/api/data/ticket-replies/${ticketId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ message, userId }), // userId might be redundant if token implies user
+    body: JSON.stringify({ message, userId }), 
   });
   if (!response.ok) {
     const err = await response.json();
     throw new Error(err.message || 'Failed to reply to ticket');
   }
   return response.json();
-  // Fallback if called without token
-  // return replyToTicketWHMCS({ clientid: userId, ticketid: ticketId, message });
 };
 
 export const openTicketAPI = async (userId: string, ticketDetails: {subject: string, department: string, message: string, priority: 'Low' | 'Medium' | 'High'}, token?: string) => {
   if (!token) throw new Error("Auth token required for openTicketAPI");
-  // The department name needs to be mapped to a department ID for WHMCS.
-  // This mapping should ideally happen on the server-side in the API route.
-  // For now, the API route will handle this logic.
   const response = await fetch('/api/data/tickets', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ ...ticketDetails, userId }), // userId might be redundant
+    body: JSON.stringify({ ...ticketDetails, userId }), 
   });
    if (!response.ok) {
     const err = await response.json();
@@ -589,5 +676,3 @@ export const openTicketAPI = async (userId: string, ticketDetails: {subject: str
   }
   return response.json();
 };
-
-
