@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Domain } from '@/types';
-import { getDomainsAPI } from '@/lib/whmcs-mock-api';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
+// Removed direct import from whmcs-mock-api
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -28,23 +29,51 @@ const StatusBadge = ({ status }: { status: Domain['status'] }) => {
 };
 
 export default function DomainsPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth(); // Added token
   const [domains, setDomains] = useState<Domain[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && token) { // Check for token
       setIsLoading(true);
-      getDomainsAPI(user.id)
-        .then(data => setDomains(data.domains))
-        .catch(error => {
-          console.error("Failed to fetch domains", error);
-          toast({ title: 'Error', description: 'Could not load domains.', variant: 'destructive' });
-        })
-        .finally(() => setIsLoading(false));
+      fetch('/api/data/domains', { // Fetch from the internal API route
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(errData => {
+            throw new Error(errData.message || `Failed to fetch domains: ${response.statusText}`);
+          }).catch(() => { // Fallback if parsing error response fails
+            throw new Error(`Failed to fetch domains: ${response.statusText}`);
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.domains) {
+          setDomains(data.domains);
+        } else {
+          console.warn("Domains data not found in API response:", data);
+          setDomains([]); // Default to empty array if domains key is missing
+          toast({ title: 'Notice', description: 'No domains found or data format unexpected.', variant: 'default' });
+        }
+      })
+      .catch(error => {
+        console.error("Failed to fetch domains", error);
+        toast({ title: 'Error', description: (error as Error).message || 'Could not load domains.', variant: 'destructive' });
+      })
+      .finally(() => setIsLoading(false));
+    } else if (!token && user?.id) {
+        setIsLoading(false);
+        console.warn("DomainsPage: User present but token is missing. Data fetching skipped.");
+    } else {
+        setIsLoading(false); // Not loading if no user or no token
     }
-  }, [user?.id, toast]);
+  }, [user?.id, token, toast]); // Added token to dependency array
+
 
   const handleAction = (domainId: string, action: string) => {
     toast({ title: 'Action Triggered', description: `${action} for domain ${domainId} (mocked).`});
