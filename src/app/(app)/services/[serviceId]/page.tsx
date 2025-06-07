@@ -8,7 +8,6 @@ import type { Service } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import {
@@ -17,7 +16,7 @@ import {
   Server,
   Settings,
   Mail,
-  MailForward,
+  Forward, // Changed from MailForward
   FileArchive,
   FolderKanban,
   Database,
@@ -303,7 +302,7 @@ export default function ServiceDetailPage() {
             <QuickShortcutItem icon={ExternalLink} label="Login to cPanel" onClick={() => handleShortcutClick("Login to cPanel")} />
           }
           <QuickShortcutItem icon={Mail} label="Email Accounts" onClick={() => handleShortcutClick("Email Accounts")} />
-          <QuickShortcutItem icon={MailForward} label="Forwarders" onClick={() => handleShortcutClick("Forwarders")} />
+          <QuickShortcutItem icon={Forward} label="Forwarders" onClick={() => handleShortcutClick("Forwarders")} /> 
           <QuickShortcutItem icon={FileArchive} label="Autoresponders" onClick={() => handleShortcutClick("Autoresponders")} />
           <QuickShortcutItem icon={FolderKanban} label="File Manager" onClick={() => handleShortcutClick("File Manager")} />
           <QuickShortcutItem icon={Settings} label="Backup" onClick={() => handleShortcutClick("Backup")} />
