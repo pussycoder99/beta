@@ -13,85 +13,126 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 
 export default function OrderServicePage() {
-  const { token } = useAuth(); 
+  const { token } = useAuth();
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [allProductsMasterList, setAllProductsMasterList] = useState<Product[]>([]); // Stores all products if source is 'DerivedFromGetProducts'
+  const [currentDisplayProducts, setCurrentDisplayProducts] = useState<Product[]>([]); // Products for the selected tab
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [isLoadingGroups, setIsLoadingGroups] = useState(true);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [dataSource, setDataSource] = useState<string | null>(null); // 'GetProductGroups' or 'DerivedFromGetProducts'
   const { toast } = useToast();
 
   useEffect(() => {
     setIsLoadingGroups(true);
+    setProductGroups([]);
+    setAllProductsMasterList([]);
+    setCurrentDisplayProducts([]);
+    setSelectedGroupId(null);
+
     fetch('/api/data/product-groups', {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
     })
       .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch product groups');
+        if (!res.ok) {
+          // Try to parse error message from backend if available
+          return res.json().then(errData => {
+            throw new Error(errData.message || 'Failed to fetch product categories configuration');
+          }).catch(() => { // Fallback if parsing error response fails
+            throw new Error('Failed to fetch product categories configuration and error response was not valid JSON');
+          });
+        }
         return res.json();
       })
       .then(data => {
-        if (data.groups) {
+        setDataSource(data.source || 'unknown');
+        if (data.groups && data.groups.length > 0) {
           setProductGroups(data.groups);
-          if (data.groups.length > 0 && !selectedGroupId) { 
-            setSelectedGroupId(data.groups[0].id);
-          } else if (data.groups.length === 0) {
-            setSelectedGroupId(null); 
-            setProducts([]); 
+          setSelectedGroupId(data.groups[0].id); // Auto-select the first group
+
+          if (data.source === 'DerivedFromGetProducts' && data.allProducts) {
+            setAllProductsMasterList(data.allProducts);
+            // Products for the initially selected group will be set by the other useEffect
           }
+          // If source is 'GetProductGroups', the other useEffect will fetch products for selectedGroupId
         } else {
           setProductGroups([]);
+          setAllProductsMasterList([]);
+          setCurrentDisplayProducts([]);
           setSelectedGroupId(null);
-          setProducts([]);
-          toast({ title: 'Error', description: data.message || 'Could not load product categories.', variant: 'destructive'});
+          toast({ title: 'No Categories', description: data.message || 'No product categories found.', variant: 'default' });
         }
       })
       .catch(error => {
-        console.error("Error fetching product groups:", error);
-        toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
+        console.error("Error fetching from /api/data/product-groups:", error);
+        toast({ title: 'Error Loading Categories', description: (error as Error).message, variant: 'destructive' });
         setProductGroups([]);
+        setAllProductsMasterList([]);
+        setCurrentDisplayProducts([]);
         setSelectedGroupId(null);
-        setProducts([]);
       })
       .finally(() => setIsLoadingGroups(false));
-  }, [token, toast]); // Only re-fetch groups if token changes or on initial load
+  }, [token, toast]);
 
   useEffect(() => {
-    if (selectedGroupId) {
-      setIsLoadingProducts(true);
-      setProducts([]); 
+    if (!selectedGroupId) {
+      setCurrentDisplayProducts([]);
+      return;
+    }
+    setIsLoadingProducts(true);
+
+    if (dataSource === 'DerivedFromGetProducts') {
+      const productsForGroup = allProductsMasterList.filter(p => p.gid === selectedGroupId);
+      setCurrentDisplayProducts(productsForGroup);
+      if (productsForGroup.length === 0) {
+        // toast({ title: 'Notice', description: 'No products found in this derived category.', variant: 'default'});
+      }
+    } else if (dataSource === 'GetProductGroups') {
+      // Fetch products specifically for this group
+      setCurrentDisplayProducts([]); // Clear previous products
       fetch(`/api/data/products?gid=${selectedGroupId}`, {
          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       })
         .then(res => {
-          if (!res.ok) throw new Error('Failed to fetch products for this group');
+          if (!res.ok) {
+            return res.json().then(errData => {
+                throw new Error(errData.message || 'Failed to fetch products for this group');
+            }).catch(() => {
+                throw new Error('Failed to fetch products for this group and error response was not valid JSON');
+            });
+          }
           return res.json();
         })
         .then(data => {
           if (data.products) {
-            setProducts(data.products);
+            setCurrentDisplayProducts(data.products);
           } else {
-            setProducts([]);
+            setCurrentDisplayProducts([]);
              toast({ title: 'Notice', description: data.message || 'No products found in this category.', variant: 'default'});
           }
         })
         .catch(error => {
           console.error(`Error fetching products for group ${selectedGroupId}:`, error);
-          toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
-          setProducts([]);
+          toast({ title: 'Error Fetching Products', description: (error as Error).message, variant: 'destructive' });
+          setCurrentDisplayProducts([]);
         })
         .finally(() => setIsLoadingProducts(false));
     } else {
-      setProducts([]);
-      setIsLoadingProducts(false);
+      // If dataSource is null or unknown, or if groups are empty.
+      setCurrentDisplayProducts([]);
     }
-  }, [selectedGroupId, token, toast]);
+     // This effect should run whenever selectedGroupId or dataSource changes, or allProductsMasterList (for derived case)
+  }, [selectedGroupId, token, toast, dataSource, allProductsMasterList]);
 
   const handleOrderNow = (productId: string, productName: string) => {
     toast({
       title: 'Order Initiated (Mock)',
       description: `Adding ${productName} (ID: ${productId}) to cart. You would be redirected to WHMCS.`,
     });
+    // In a real app, construct the WHMCS cart URL:
+    // const whmcsAppUrl = process.env.NEXT_PUBLIC_WHMCS_APP_URL || "https://your-whmcs-url.com";
+    // const whmcsCartUrl = `${whmcsAppUrl}/cart.php?a=add&pid=${productId}`;
+    // window.location.href = whmcsCartUrl;
   };
 
   if (isLoadingGroups && productGroups.length === 0) {
@@ -129,20 +170,21 @@ export default function OrderServicePage() {
                 <CardTitle className="flex items-center gap-2"><AlertTriangle className="text-yellow-500"/>No Product Categories Found</CardTitle>
             </CardHeader>
             <CardContent>
-                <p className="text-muted-foreground">We couldn&apos;t find any product categories at the moment. This might be due to a configuration issue or no products being available. Please check your server logs for more details from the WHMCS API, or contact support if this issue persists.</p>
+                <p className="text-muted-foreground">We couldn't find any product categories. This could be due to your WHMCS API role missing the 'GetProductGroups' permission, or no product groups being configured in your WHMCS setup. If 'GetProductGroups' is unavailable, the system attempts to derive groups from all products, which might also result in no categories if products lack group name information in the API response.</p>
+                <p className="text-muted-foreground mt-2">Please check your WHMCS API Role permissions and ensure product groups are set up. Also, check server logs for more details on API responses.</p>
             </CardContent>
         </Card>
       )}
 
       {productGroups.length > 0 && (
-        <Tabs 
-            value={selectedGroupId || (productGroups[0] ? productGroups[0].id : '')} 
-            onValueChange={setSelectedGroupId} 
+        <Tabs
+            value={selectedGroupId || (productGroups.length > 0 ? productGroups[0].id : '')}
+            onValueChange={setSelectedGroupId}
             className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 h-auto flex-wrap">
             {productGroups.map(group => (
-              <TabsTrigger key={group.id} value={group.id} className="text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger key={group.id} value={group.id} className="text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground py-2 px-3">
                 {group.name}
               </TabsTrigger>
             ))}
@@ -171,18 +213,19 @@ export default function OrderServicePage() {
                 </div>
               )}
 
-              {!isLoadingProducts && selectedGroupId === group.id && products.length === 0 && (
+              {!isLoadingProducts && selectedGroupId === group.id && currentDisplayProducts.length === 0 && (
                 <Card>
                     <CardContent className="p-6 text-center">
                         <AlertTriangle className="mx-auto h-10 w-10 text-muted-foreground mb-3"/>
                         <p className="text-muted-foreground">No products available in this category currently.</p>
+                         {dataSource === 'DerivedFromGetProducts' && <p className="text-xs text-muted-foreground mt-1">(Products filtered from all available items)</p>}
                     </CardContent>
                 </Card>
               )}
 
-              {!isLoadingProducts && selectedGroupId === group.id && products.length > 0 && (
+              {!isLoadingProducts && selectedGroupId === group.id && currentDisplayProducts.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {products.map(product => (
+                  {currentDisplayProducts.map(product => (
                     <Card key={product.pid} className="shadow-lg flex flex-col">
                       <CardHeader>
                         <CardTitle className="text-xl text-primary">{product.name}</CardTitle>

@@ -490,6 +490,8 @@ export const addFundsWHMCS = async (
   }
 };
 
+// This function is for the original approach (using GetProductGroups WHMCS API)
+// It will be called by the /api/data/product-groups route IF that API is available in WHMCS
 export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[], whmcsData?: any }> => {
   try {
     const data = await callWhmcsApi('GetProductGroups', {});
@@ -503,26 +505,28 @@ export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[],
           headline: g.headline,
           tagline: g.tagline,
           order: parseInt(g.order, 10) || 0,
-        })).sort((a, b) => a.order - b.order);
-        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful. Found ${groups.length} groups. Parsed groups:`, JSON.stringify(groups.map(g => ({id: g.id, name: g.name}))));
-        console.log(`[WHMCS API SERVER INFO] Raw data.groups from WHMCS:`, JSON.stringify(data.groups));
+        })).sort((a, b) => (a.order || 0) - (b.order || 0));
+        console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful. Found ${groups.length} groups. Parsed groups:`, JSON.stringify(groups.map(g => ({id: g.id, name: g.name}))));
+        console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] Raw data.groups from WHMCS:`, JSON.stringify(data.groups));
       } else if (data.groups) {
-        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful, but data.groups.group is missing or empty. Raw data.groups:`, JSON.stringify(data.groups), `Full data:`, JSON.stringify(data));
+        console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful, but data.groups.group is missing or empty. Raw data.groups:`, JSON.stringify(data.groups), `Full data:`, JSON.stringify(data));
       } else {
-        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful, but data.groups is missing. Full data:`, JSON.stringify(data));
+        console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful, but data.groups is missing. Full data:`, JSON.stringify(data));
       }
     } else {
-      console.warn(`[WHMCS API SERVER WARN] GetProductGroups API call failed. Full data:`, JSON.stringify(data));
+      console.warn(`[WHMCS API SERVER WARN - getProductGroupsWHMCS] GetProductGroups API call failed. Full data:`, JSON.stringify(data));
+      // If GetProductGroups fails, we still return empty groups, and the new API route will try the alternative.
     }
     return { groups, whmcsData: data };
   } catch (error) {
-    console.error("[WHMCS API SERVER CATCH ERROR] Failed to fetch product groups:", error);
+    console.error("[WHMCS API SERVER CATCH ERROR - getProductGroupsWHMCS] Failed to fetch product groups:", error);
+    // If GetProductGroups fails, we still return empty groups, and the new API route will try the alternative.
     return { groups: [] };
   }
 };
 
 const getDisplayPrice = (pricing: ProductPricing, currencyCodeFromProduct: string | undefined): string => {
-  const targetCurrencyCode = currencyCodeFromProduct || 'USD';
+  const targetCurrencyCode = currencyCodeFromProduct || 'USD'; // Default to USD if not available
   const currencyPricing = pricing[targetCurrencyCode];
 
   if (!currencyPricing) {
@@ -535,7 +539,7 @@ const getDisplayPrice = (pricing: ProductPricing, currencyCodeFromProduct: strin
             const priceKey = cycle as keyof typeof firstAvailableCurrencyPricing;
             if (Object.prototype.hasOwnProperty.call(firstAvailableCurrencyPricing, priceKey) && typeof firstAvailableCurrencyPricing[priceKey] === 'string') {
                 const priceValue = parseFloat(firstAvailableCurrencyPricing[priceKey] as string);
-                 if (priceValue >= 0) {
+                 if (priceValue >= 0) { // Price is valid (not -1.00 which means not available)
                     let cycleName = cycle.charAt(0).toUpperCase() + cycle.slice(1);
                     if (cycle === 'monthly') cycleName = "/mo";
                     else if (cycle === 'annually') cycleName = "/yr";
@@ -550,15 +554,17 @@ const getDisplayPrice = (pricing: ProductPricing, currencyCodeFromProduct: strin
         }
       }
     }
-    return "Contact Us";
+    return "Contact Us"; // Fallback if no pricing found
   }
 
+  // Standard cycles check
   const cycles = ['monthly', 'quarterly', 'semiannually', 'annually', 'biennially', 'triennially', 'onetime'];
   for (const cycle of cycles) {
     const priceKey = cycle as keyof typeof currencyPricing;
+    // Check if the cycle exists and is a valid price (not -1.00 which means not available for that cycle)
     if (Object.prototype.hasOwnProperty.call(currencyPricing, priceKey) && typeof currencyPricing[priceKey] === 'string') {
         const priceValue = parseFloat(currencyPricing[priceKey] as string);
-        if (priceValue >= 0) {
+        if (priceValue >= 0) { // Price is valid
             let cycleName = cycle.charAt(0).toUpperCase() + cycle.slice(1);
             if (cycle === 'monthly') cycleName = "/mo";
             else if (cycle === 'annually') cycleName = "/yr";
@@ -571,15 +577,22 @@ const getDisplayPrice = (pricing: ProductPricing, currencyCodeFromProduct: strin
         }
     }
   }
-  return "Contact Us";
+  return "Contact Us"; // Fallback if no valid pricing found for any cycle
 };
 
-
+// Fetches products, optionally filtered by GID.
+// When GID is not provided, it fetches ALL products.
+// It's expected that WHMCS GetProducts API includes 'groupname' for each product when fetching all.
 export const getProductsWHMCS = async (gid?: string): Promise<{ products: Product[], whmcsData?: any }> => {
   try {
-    const params: Record<string, any> = { }; // GetProducts doesn't use include_features
+    const params: Record<string, any> = { };
     if (gid) {
       params.gid = gid;
+    } else {
+      // Fetching all products, so no gid.
+      // WHMCS documentation suggests that when fetching all products, 'groupname' is included.
+      // We rely on this for the "derive groups" strategy.
+      console.log("[WHMCS API SERVER INFO - getProductsWHMCS] Fetching ALL products (no GID specified). Expecting 'groupname' in response for each product.");
     }
     const data = await callWhmcsApi('GetProducts', params);
     let products: Product[] = [];
@@ -588,35 +601,45 @@ export const getProductsWHMCS = async (gid?: string): Promise<{ products: Produc
       const productsArray = Array.isArray(data.products.product) ? data.products.product : [data.products.product];
       products = productsArray.map((p: any) => {
         const pricing = p.pricing as ProductPricing;
+        // The currency code might be part of the product itself or needs to be inferred
         const currencyCodeFromProduct = p.pricing ? Object.keys(p.pricing)[0] : undefined;
+
+        if (!gid && !p.groupname) {
+            console.warn(`[WHMCS API SERVER WARN - getProductsWHMCS] Product PID ${p.pid} is missing 'groupname' when fetching all products. Group derivation might be incomplete.`);
+        }
 
         return {
           pid: p.pid.toString(),
           gid: p.gid.toString(),
+          groupname: p.groupname, // Crucial for deriving groups if GetProductGroups is unavailable
           type: p.type,
           name: p.name,
           slug: p.slug,
           "product-url": p['product-url'],
-          description: p.description,
+          description: p.description, // HTML content
           module: p.module,
-          paytype: p.paytype,
+          paytype: p.paytype as 'free' | 'onetime' | 'recurring',
           pricing: pricing,
           displayPrice: getDisplayPrice(pricing, currencyCodeFromProduct),
           allowqty: p.allowqty,
           quantity_available: p.quantity_available
         };
       });
+      if (!gid) {
+        console.log(`[WHMCS API SERVER INFO - getProductsWHMCS] Successfully fetched ${products.length} products (all). First few products raw:`, JSON.stringify(productsArray.slice(0,2)));
+      }
     } else if (data.result !== 'success') {
-      console.warn(`[WHMCS API SERVER WARN] GetProducts API call ${gid ? `for GID ${gid}` : ''} failed. Data:`, data);
+      console.warn(`[WHMCS API SERVER WARN - getProductsWHMCS] GetProducts API call ${gid ? `for GID ${gid}` : '(all products)'} failed. Data:`, data);
     } else {
-      console.log(`[WHMCS API SERVER INFO] No products found ${gid ? `for GID ${gid}` : ''}. Data:`, data);
+      console.log(`[WHMCS API SERVER INFO - getProductsWHMCS] No products found ${gid ? `for GID ${gid}` : '(all products)'}. Data:`, data);
     }
     return { products, whmcsData: data };
   } catch (error) {
-    console.error("[WHMCS API SERVER CATCH ERROR] Failed to fetch products:", error);
+    console.error("[WHMCS API SERVER CATCH ERROR - getProductsWHMCS] Failed to fetch products:", error);
     return { products: [] };
   }
 };
+
 
 // --- Functions below are legacy and mainly for pages that might still directly import them ---
 // --- These should be refactored to use the Next.js API routes for secure credential handling ---

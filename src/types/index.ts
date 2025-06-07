@@ -89,11 +89,11 @@ export interface Ticket {
 }
 
 export interface ProductGroup {
-  id: string;
-  name: string;
-  headline?: string;
-  tagline?: string;
-  order: number;
+  id: string; // This will be the 'gid'
+  name: string; // This will be the 'groupname'
+  headline?: string; // May not be available when deriving from products
+  tagline?: string; // May not be available when deriving from products
+  order?: number; // May not be available when deriving from products
 }
 
 export interface ProductPricing {
@@ -115,29 +115,19 @@ export interface ProductPricing {
   };
 }
 
-// ProductFeature is a conceptual type. The GetProducts API returns
-// `customfields` and `configoptions` which are structured differently
-// and more complex. For general order forms, the main HTML `description`
-// field of a product is often used for detailed features.
-export interface ProductFeature {
-  [featureName: string]: string;
-}
-
-
 export interface Product {
   pid: string;
   gid: string;
+  groupname?: string; // Important for deriving groups
   type: string;
   name: string;
-  slug?: string; // From WHMCS GetProducts API
-  "product-url"?: string; // From WHMCS GetProducts API
+  slug?: string;
+  "product-url"?: string;
   description: string; // HTML content
   module: string;
   paytype: 'free' | 'onetime' | 'recurring';
   pricing: ProductPricing;
   displayPrice?: string;
-  allowqty?: number; // From WHMCS GetProducts API
-  quantity_available?: number; // From WHMCS GetProducts API
-  // `customfields` and `configoptions` are available in raw WHMCS GetProducts response
-  // but are not directly mapped here for simplicity in this type.
+  allowqty?: number;
+  quantity_available?: number;
 }
