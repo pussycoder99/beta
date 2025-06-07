@@ -71,12 +71,14 @@ export const validateLoginWHMCS = async (email: string, passwordAttempt: string)
   const directFormData = new URLSearchParams();
   directFormData.append('action', 'ValidateLogin');
   
+  // Add API authentication credentials if they exist
   if (WHMCS_API_IDENTIFIER && WHMCS_API_SECRET) {
+    // Using 'username' and 'password' as per WHMCS docs for API call authentication
     directFormData.append('username', WHMCS_API_IDENTIFIER); 
     directFormData.append('password', WHMCS_API_SECRET);   
   } else {
-    console.warn("[WHMCS API SERVER WARN] Missing WHMCS_API_IDENTIFIER or WHMCS_API_SECRET for ValidateLogin API authentication.");
-    return { result: 'error', message: 'Server API credentials not configured for ValidateLogin.' };
+    console.warn("[WHMCS API SERVER WARN] Missing WHMCS_API_IDENTIFIER or WHMCS_API_SECRET for ValidateLogin API authentication. This might be okay if not required by your WHMCS setup for this specific action.");
+    // Proceeding without them, as ValidateLogin might sometimes work without API user auth depending on setup
   }
   
   directFormData.append('email', email); 
@@ -501,21 +503,26 @@ export const addFundsWHMCS = async (
 
 export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[], whmcsData?: any }> => {
   try {
-    const data = await callWhmcsApi('GetProductGroups', { }); // No specific params needed for all groups usually
+    const data = await callWhmcsApi('GetProductGroups', {});
     let groups: ProductGroup[] = [];
-    if (data.result === 'success' && data.groups?.group) {
-      const groupsArray = Array.isArray(data.groups.group) ? data.groups.group : [data.groups.group];
-      groups = groupsArray.map((g: any) => ({
-        id: g.id.toString(),
-        name: g.name,
-        headline: g.headline,
-        tagline: g.tagline,
-        order: parseInt(g.order, 10) || 0,
-      })).sort((a,b) => a.order - b.order);
-    } else if (data.result !== 'success') {
-      console.warn(`[WHMCS API SERVER WARN] GetProductGroups API call failed. Data:`, data);
+    if (data.result === 'success') {
+      if (data.groups && data.groups.group) {
+        const groupsArray = Array.isArray(data.groups.group) ? data.groups.group : [data.groups.group];
+        groups = groupsArray.map((g: any) => ({
+          id: g.id.toString(),
+          name: g.name,
+          headline: g.headline,
+          tagline: g.tagline,
+          order: parseInt(g.order, 10) || 0,
+        })).sort((a, b) => a.order - b.order);
+        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful. Found ${groups.length} groups. Parsed groups:`, groups);
+      } else if (data.groups) {
+        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful, but data.groups.group is missing or empty. Raw data.groups:`, data.groups, `Full data:`, data);
+      } else {
+        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful, but data.groups is missing. Full data:`, data);
+      }
     } else {
-      console.log(`[WHMCS API SERVER INFO] No product groups found. Data:`, data);
+      console.warn(`[WHMCS API SERVER WARN] GetProductGroups API call failed. Full data:`, data);
     }
     return { groups, whmcsData: data };
   } catch (error) {
@@ -676,3 +683,4 @@ export const openTicketAPI = async (userId: string, ticketDetails: {subject: str
   }
   return response.json();
 };
+
