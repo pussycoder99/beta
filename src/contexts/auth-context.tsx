@@ -35,16 +35,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+        const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response fetching user' }));
         throw new Error(errorData.message || `Failed to fetch user details: ${response.statusText}`);
       }
 
       const data = await response.json();
       if (data.user) {
         setUser(data.user);
-        setToken(storedToken); // Keep the original placeholder token
+        setToken(storedToken);
       } else {
-        throw new Error('User data not found in response');
+        throw new Error('User data not found in /api/auth/user response');
       }
     } catch (error) {
       console.error("Error fetching user with token:", error);
@@ -61,12 +61,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (storedToken) {
       fetchUserWithToken(storedToken);
     } else {
-      setIsLoading(false); // No token, so not loading user data
+      setIsLoading(false);
     }
   }, [fetchUserWithToken]);
 
   useEffect(() => {
-    // Only redirect if not loading, no user, and not on public auth pages or root
     if (!isLoading && !user && !pathname.startsWith('/login') && !pathname.startsWith('/register') && pathname !== '/') {
       router.push('/login');
     }
@@ -89,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (data.user && data.token) {
         setUser(data.user);
-        setToken(data.token); // This is the placeholder token like "mock-jwt-token-for-USERID"
+        setToken(data.token);
         localStorage.setItem('authToken', data.token);
         router.push('/dashboard');
       } else {
@@ -99,7 +98,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       setToken(null);
       localStorage.removeItem('authToken');
-      throw error; // Re-throw to be caught by LoginForm
+      let errorMessage = (error as Error).message || 'Login failed. Please try again.';
+      try {
+        // Check if errorMessage itself is a stringified JSON containing another 'message'
+        const parsedMessageContainer = JSON.parse(errorMessage);
+        if (parsedMessageContainer && parsedMessageContainer.message) {
+          errorMessage = parsedMessageContainer.message;
+        }
+      } catch (parseError) {
+        // It wasn't a JSON string, or didn't have an inner .message, so keep the original errorMessage
+      }
+      throw new Error(errorMessage); 
     } finally {
       setIsLoading(false);
     }
@@ -119,10 +128,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!response.ok) {
         throw new Error(data.message || 'Registration failed');
       }
-      // Registration successful, now redirect to login
       router.push('/login');
     } catch (error) {
-      throw error; // Re-throw to be caught by RegisterForm
+      let errorMessage = (error as Error).message || 'Registration failed. Please try again.';
+      try {
+        const parsedMessageContainer = JSON.parse(errorMessage);
+        if (parsedMessageContainer && parsedMessageContainer.message) {
+          errorMessage = parsedMessageContainer.message;
+        }
+      } catch (parseError) {
+        // Not a JSON string, keep original
+      }
+      throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -141,5 +158,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
-
-    
