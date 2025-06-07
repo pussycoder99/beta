@@ -1,9 +1,10 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Service } from '@/types';
-import { getClientsProductsAPI } from '@/lib/whmcs-mock-api';
+// Removed direct import from whmcs-mock-api
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,26 +31,53 @@ const StatusBadge = ({ status }: { status: Service['status'] }) => {
 };
 
 export default function ServicesPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth(); // Added token
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && token) { // Check for token
       setIsLoading(true);
-      getClientsProductsAPI(user.id)
-        .then(data => setServices(data.services))
-        .catch(error => {
-          console.error("Failed to fetch services", error);
-          toast({ title: 'Error', description: 'Could not load services.', variant: 'destructive' });
-        })
-        .finally(() => setIsLoading(false));
+      fetch('/api/data/services', { // Fetch from the internal API route
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(errData => {
+            throw new Error(errData.message || `Failed to fetch services: ${response.statusText}`);
+          }).catch(() => {
+            throw new Error(`Failed to fetch services: ${response.statusText}`);
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.services) {
+          setServices(data.services);
+        } else {
+          console.warn("Services data not found in API response:", data);
+          setServices([]); // Default to empty array if services key is missing
+          toast({ title: 'Notice', description: 'No services found or data format unexpected.', variant: 'default' });
+        }
+      })
+      .catch(error => {
+        console.error("Failed to fetch services", error);
+        toast({ title: 'Error', description: (error as Error).message || 'Could not load services.', variant: 'destructive' });
+      })
+      .finally(() => setIsLoading(false));
+    } else if (!token && user?.id) {
+        setIsLoading(false);
+        console.warn("ServicesPage: User present but token is missing. Data fetching skipped.");
+    } else {
+        setIsLoading(false); // Not loading if no user or no token
     }
-  }, [user?.id, toast]);
+  }, [user?.id, token, toast]); // Added token to dependency array
 
   const handleAction = (serviceId: string, action: string) => {
-    // Mock action
+    // Mock action - In a real app, these would likely be API calls too
     toast({ title: 'Action Triggered', description: `${action} for service ${serviceId} (mocked).`});
   };
 
