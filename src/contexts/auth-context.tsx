@@ -1,17 +1,11 @@
+
 "use client";
 
 import type { User } from '@/types';
+// API functions will now point to the (modified) whmcs-mock-api.ts which contains live calls
 import { validateLoginAPI, addClientAPI, getUserDetailsAPI } from '@/lib/whmcs-mock-api';
 import { useRouter, usePathname } from 'next/navigation';
 import React, { createContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-
-// Helper to simulate password hashing (very basic)
-const simpleHash = async (password: string) => {
-  // In a real app, use a proper hashing library like bcrypt or argon2
-  // This is just a placeholder and NOT secure.
-  return `hashed_${password}`;
-};
-
 
 interface AuthContextType {
   user: User | null;
@@ -34,15 +28,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserFromToken = useCallback(async (storedToken: string) => {
     setIsLoading(true);
-    // In a real JWT scenario, you'd validate the token with a backend
-    // and fetch user details. Here, we extract userId from mock token.
-    const userId = storedToken.replace('mock-jwt-token-for-', '');
+    // This token is now a placeholder like "whmcs-session-for-USERID"
+    // or "mock-jwt-token-for-USERID" if login was successful
+    const userIdPrefix = "whmcs-session-for-"; // Or your chosen prefix
+    const mockJwtPrefix = "mock-jwt-token-for-";
+
+    let userId: string | null = null;
+
+    if (storedToken.startsWith(userIdPrefix)) {
+      userId = storedToken.replace(userIdPrefix, '');
+    } else if (storedToken.startsWith(mockJwtPrefix)) {
+      userId = storedToken.replace(mockJwtPrefix, '');
+    }
+    
     if (userId) {
-      const { user: fetchedUser } = await getUserDetailsAPI(userId);
-      if (fetchedUser) {
-        setUser(fetchedUser);
-        setToken(storedToken);
-      } else {
+      try {
+        const { user: fetchedUser } = await getUserDetailsAPI(userId);
+        if (fetchedUser) {
+          setUser(fetchedUser);
+          setToken(storedToken); // Keep the same placeholder token
+        } else {
+          localStorage.removeItem('authToken');
+          setUser(null);
+          setToken(null);
+        }
+      } catch (error) {
+        console.error("Error fetching user details from token:", error);
         localStorage.removeItem('authToken');
         setUser(null);
         setToken(null);
@@ -66,41 +77,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [fetchUserFromToken]);
 
   useEffect(() => {
-    if (!isLoading && !user && !pathname.startsWith('/login') && !pathname.startsWith('/register')) {
+    if (!isLoading && !user && !pathname.startsWith('/login') && !pathname.startsWith('/register') && pathname !== '/') {
       router.push('/login');
     }
   }, [isLoading, user, pathname, router]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    const hashedPassword = await simpleHash(password); // Simulate hashing
-    const response = await validateLoginAPI(email, hashedPassword);
-    if (response.result === 'success' && response.user && response.token) {
-      setUser(response.user);
-      setToken(response.token);
-      localStorage.setItem('authToken', response.token);
-      router.push('/dashboard');
-    } else {
-      throw new Error(response.message || 'Login failed');
+    try {
+      // Call validateLoginAPI which now interacts with live WHMCS
+      // It expects the raw password.
+      const response = await validateLoginAPI(email, password);
+      if (response.result === 'success' && response.userId) {
+        // Fetch full user details using the userId from WHMCS
+        const userDetailsResponse = await getUserDetailsAPI(response.userId);
+        if (userDetailsResponse.user) {
+          setUser(userDetailsResponse.user);
+          // Create a placeholder token. In production, your backend might issue a real JWT/session here.
+          const sessionToken = `mock-jwt-token-for-${response.userId}`;
+          setToken(sessionToken);
+          localStorage.setItem('authToken', sessionToken);
+          router.push('/dashboard');
+        } else {
+          throw new Error('Failed to fetch user details after login.');
+        }
+      } else {
+        throw new Error(response.message || 'Login failed');
+      }
+    } catch (error) {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('authToken');
+      throw error; // Re-throw to be caught by LoginForm
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const register = async (userData: Omit<User, 'id'> & {password: string}) => {
     setIsLoading(true);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...clientData } = userData; 
-    // In real WHMCS, password is sent directly, not pre-hashed by client usually
-    // For AddClient, WHMCS handles password hashing.
-    // However, our mock API doesn't use password, so we just pass clientData.
-    const response = await addClientAPI(clientData);
-    if (response.result === 'success' && response.userId) {
-      // Optionally auto-login or redirect to login page
-      router.push('/login');
-    } else {
-      throw new Error(response.message || 'Registration failed');
+    try {
+      // Pass all data including password to addClientAPI.
+      // WHMCS's AddClient API handles password hashing.
+      const response = await addClientAPI(userData);
+      if (response.result === 'success' && response.userId) {
+        // Registration successful, redirect to login
+        router.push('/login');
+      } else {
+        throw new Error(response.message || 'Registration failed');
+      }
+    } catch (error) {
+      throw error; // Re-throw to be caught by RegisterForm
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const logout = () => {
@@ -116,3 +146,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
