@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -5,14 +6,15 @@ import { useAuth } from '@/hooks/use-auth';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { BarChart, Bell, CheckCircle, CreditCard, Globe, Server, ShieldAlert, Ticket as TicketIcon, Users, XCircle } from 'lucide-react';
+import { Bell, CreditCard, Globe, Server, ShieldAlert, Ticket as TicketIcon } from 'lucide-react';
 import Link from 'next/link';
-import type { Service, Invoice, Ticket } from '@/types';
-import { getClientsProductsAPI, getInvoicesAPI, getTicketsAPI } from '@/lib/whmcs-mock-api';
+import type { Service, Invoice, Ticket, Domain } from '@/types';
+import { getClientsProductsAPI, getInvoicesAPI, getTicketsAPI, getDomainsAPI } from '@/lib/whmcs-mock-api';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface DashboardStats {
   activeServices: number;
+  domainsCount: number;
   pendingRenewals: number; // Services due in next 30 days
   unpaidInvoices: number;
   openTickets: number;
@@ -31,10 +33,11 @@ export default function DashboardPage() {
       const fetchData = async () => {
         setIsLoading(true);
         try {
-          const [servicesData, invoicesData, ticketsData] = await Promise.all([
+          const [servicesData, invoicesData, ticketsData, domainsData] = await Promise.all([
             getClientsProductsAPI(user.id),
             getInvoicesAPI(user.id),
             getTicketsAPI(user.id),
+            getDomainsAPI(user.id),
           ]);
 
           const activeServices = servicesData.services.filter(s => s.status === 'Active').length;
@@ -52,8 +55,11 @@ export default function DashboardPage() {
           const open = ticketsData.tickets.filter(t => t.status === 'Open' || t.status === 'Answered' || t.status === 'Customer-Reply').length;
           setRecentTickets(ticketsData.tickets.filter(t => t.status === 'Open' || t.status === 'Answered' || t.status === 'Customer-Reply').slice(0,3));
 
+          const activeDomains = domainsData.domains.filter(d => d.status === 'Active').length;
+
           setStats({
             activeServices,
+            domainsCount: activeDomains,
             pendingRenewals: pending.length,
             unpaidInvoices: unpaid,
             openTickets: open,
@@ -132,7 +138,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Active Services" value={stats?.activeServices ?? 0} icon={Server} link="/services" linkText="View services" />
-        <StatCard title="Domains" value={stats ? mockDomains.filter(d=>(d as any).userId === user.id).length : 0} icon={Globe} link="/domains" linkText="Manage domains" />
+        <StatCard title="Active Domains" value={stats?.domainsCount ?? 0} icon={Globe} link="/domains" linkText="Manage domains" />
         <StatCard title="Unpaid Invoices" value={stats?.unpaidInvoices ?? 0} icon={CreditCard} link="/billing" linkText="Pay invoices" />
         <StatCard title="Open Tickets" value={stats?.openTickets ?? 0} icon={TicketIcon} link="/support" linkText="View tickets" />
       </div>
@@ -182,7 +188,7 @@ export default function DashboardPage() {
                       </p>
                     </div>
                      <Button variant={invoice.status === 'Overdue' ? 'destructive' : 'outline'} size="sm" asChild>
-                      <Link href={`/billing/${invoice.id}`}>Pay Now</Link>
+                      <Link href={`/billing`}>Pay Now</Link> {/* Simplified link to billing page */}
                     </Button>
                   </li>
                 ))}
@@ -214,3 +220,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
