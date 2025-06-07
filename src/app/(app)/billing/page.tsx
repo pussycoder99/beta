@@ -1,9 +1,10 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Invoice } from '@/types';
-import { getInvoicesAPI } from '@/lib/whmcs-mock-api';
+// Removed direct import of getInvoicesAPI
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,33 +29,62 @@ const StatusBadge = ({ status }: { status: Invoice['status'] }) => {
 };
 
 export default function BillingPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth(); // Added token
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && token) { // Check for token
       setIsLoading(true);
-      getInvoicesAPI(user.id)
-        .then(data => setInvoices(data.invoices))
-        .catch(error => {
-          console.error("Failed to fetch invoices", error);
-          toast({ title: 'Error', description: 'Could not load invoices.', variant: 'destructive' });
-        })
-        .finally(() => setIsLoading(false));
+      fetch('/api/data/invoices', { // Fetch from the internal API route
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(errData => {
+            throw new Error(errData.message || `Failed to fetch invoices: ${response.statusText}`);
+          }).catch(() => { // Fallback if parsing error response fails
+            throw new Error(`Failed to fetch invoices: ${response.statusText}`);
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.invoices) {
+          setInvoices(data.invoices);
+        } else {
+          console.warn("Invoices data not found in API response:", data);
+          setInvoices([]); // Default to empty array if invoices key is missing
+          toast({ title: 'Notice', description: 'No invoices found or data format unexpected.', variant: 'default' });
+        }
+      })
+      .catch(error => {
+        console.error("Failed to fetch invoices", error);
+        toast({ title: 'Error', description: (error as Error).message || 'Could not load invoices.', variant: 'destructive' });
+      })
+      .finally(() => setIsLoading(false));
+    } else if (!token && user?.id) {
+        setIsLoading(false);
+        console.warn("BillingPage: User present but token is missing. Data fetching skipped.");
+    } else {
+        setIsLoading(false); // Not loading if no user or no token
     }
-  }, [user?.id, toast]);
+  }, [user?.id, token, toast]); // Added token to dependency array
+
 
   const handlePayInvoice = (invoiceId: string) => {
     // In a real app, redirect to WHMCS payment gateway or a payment page
+    // Example: window.open(`https://portal.snbdhost.com/viewinvoice.php?id=${invoiceId}`, '_blank');
     toast({ title: 'Payment Action', description: `Redirecting to pay invoice ${invoiceId} (mocked).`});
-    // router.push(`/pay/${invoiceId}`); or WHMCS direct link
   };
 
   const handleDownloadPdf = (invoiceId: string) => {
+    // In a real app, this would link to the WHMCS PDF download URL
+    // Example: window.open(`https://portal.snbdhost.com/dl.php?type=i&id=${invoiceId}`, '_blank');
     toast({ title: 'Download Action', description: `Downloading PDF for invoice ${invoiceId} (mocked).`});
-    // window.open(`/api/invoice-pdf/${invoiceId}`); or WHMCS direct link
   };
   
   if (isLoading) {
@@ -138,3 +168,4 @@ export default function BillingPage() {
     </div>
   );
 }
+

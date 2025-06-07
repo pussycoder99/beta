@@ -1,4 +1,5 @@
 
+
 import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus } from '@/types';
 import { format } from 'date-fns';
 
@@ -322,8 +323,15 @@ export const getTicketsWHMCS = async (userId: string, statusFilter: string = 'Al
         // If not, you might fetch all and filter client-side, or make multiple calls.
         // For now, let's assume 'Open' is a primary active status for simplicity if 'All Active' is not a direct filter.
         // A more robust approach might be needed based on WHMCS API capabilities for multi-status filtering.
-        params.status_custom_operator = 'OR'; // This is a guess, check WHMCS docs
-        params.status = 'Open,Answered,Customer-Reply,In Progress'; // Example if comma-separated list is supported
+        // params.status_custom_operator = 'OR'; // This is a guess, check WHMCS docs
+        // params.status = 'Open,Answered,Customer-Reply,In Progress'; // Example if comma-separated list is supported
+        // WHMCS API often defaults to "active" tickets if no status is specified,
+        // or specific statuses need to be OR'd if the API allows complex queries.
+        // For simplicity, if 'All Active' is requested, we might just omit the status filter to get WHMCS default active tickets,
+        // or explicitly list typical active statuses if the API supports comma-separated lists for 'status'.
+        // The WHMCS 'GetTickets' API typically returns tickets that aren't 'Closed' by default or with simple 'Open' type filters.
+        // Let's try fetching without a specific status filter for "All Active" and rely on WHMCS behavior, or use a common active status.
+        // We can refine this if the results aren't as expected.
     }
 
     const data = await callWhmcsApi('GetTickets', params);
@@ -340,6 +348,12 @@ export const getTicketsWHMCS = async (userId: string, statusFilter: string = 'Al
             dateOpened: t.date,
             priority: t.priority as 'Low' | 'Medium' | 'High',
         }));
+         // If "All Active" was requested and we didn't filter by specific active statuses via API, filter here.
+        if (statusFilter === 'All Active') {
+          const activeStatuses: TicketStatus[] = ['Open', 'Answered', 'Customer-Reply', 'In Progress', 'On Hold'];
+          tickets = tickets.filter(ticket => activeStatuses.includes(ticket.status));
+        }
+
     } else if (data.result !== 'success') {
         console.warn(`[WHMCS API SERVER WARN] GetTickets for user ${userId}, status ${statusFilter} API call failed. Data:`, data);
     } else {
@@ -354,8 +368,6 @@ export const getTicketsWHMCS = async (userId: string, statusFilter: string = 'Al
 
 export const getTicketByIdWHMCS = async (ticketId: string): Promise<{ ticket?: Ticket, whmcsData?: any }> => {
   try {
-    // Assuming ticketId is sufficient and clientid is not strictly required by WHMCS API for GetTicket by ID
-    // if it is, it would need to be passed, possibly from session or a context
     const data = await callWhmcsApi('GetTicket', { ticketid: ticketId }); 
     
     if (data.result === 'success') {
@@ -393,12 +405,9 @@ export const getTicketByIdWHMCS = async (ticketId: string): Promise<{ ticket?: T
 
 export const openTicketWHMCS = async (ticketData: { clientid: string, deptid: string; subject: string; message: string; priority: 'Low' | 'Medium' | 'High'; serviceid?: string }): Promise<{ result: 'success' | 'error'; message?: string; ticketId?: string; ticketNumber?: string }> => {
   try {
-    // deptid needs to be the ID of the department, not the name.
-    // This often requires a preliminary call to GetSupportDepartments or hardcoding if known.
-    // For now, assuming deptid is correctly passed as an ID.
     const params = {
       clientid: ticketData.clientid,
-      deptid: ticketData.deptid, // This should be the department ID
+      deptid: ticketData.deptid, 
       subject: ticketData.subject,
       message: ticketData.message,
       priority: ticketData.priority,
@@ -421,24 +430,19 @@ export const replyToTicketWHMCS = async (replyData: { ticketid: string, message:
       ticketid: replyData.ticketid, 
       message: replyData.message,
     };
-    // WHMCS determines sender based on presence of clientid or adminusername
     if (replyData.clientid) {
         params.clientid = replyData.clientid;
     } else if (replyData.adminusername) {
-        // This implies an admin is replying. If not using admin context, this shouldn't be set.
-        // For client replies, ensure clientid is set and adminusername is not.
         params.adminusername = replyData.adminusername; 
     }
     
     const data = await callWhmcsApi('AddTicketReply', params);
     if (data.result === 'success') {
-      // WHMCS AddTicketReply doesn't return the new reply object directly.
-      // We construct a temporary one for immediate UI update. The actual data will be fetched on next GetTicket call.
       const newReply: TicketReply = { 
-        id: `temp-reply-${Date.now()}-${Math.random().toString(16).slice(2)}`, // Placeholder ID
-        author: replyData.clientid ? 'Client' : 'Support Staff', // Infer author
+        id: `temp-reply-${Date.now()}-${Math.random().toString(16).slice(2)}`, 
+        author: replyData.clientid ? 'Client' : 'Support Staff', 
         message: replyData.message,
-        date: format(new Date(), 'yyyy-MM-dd HH:mm:ss'), // Current time as placeholder
+        date: format(new Date(), 'yyyy-MM-dd HH:mm:ss'), 
       };
       return { result: 'success', reply: newReply };
     }
@@ -448,7 +452,6 @@ export const replyToTicketWHMCS = async (replyData: { ticketid: string, message:
   }
 };
 
-// New function for CreateSsoToken
 export const createSsoTokenWHMCS = async (
   params: { clientid?: string; service_id?: number; module?: string; destination?: string }
 ): Promise<{ result: 'success' | 'error'; message?: string; redirect_url?: string }> => {
@@ -458,10 +461,10 @@ export const createSsoTokenWHMCS = async (
     }
     
     const whmcsParams: Record<string, any> = {};
-    if (params.clientid) whmcsParams.client_id = params.clientid; // WHMCS API uses client_id
+    if (params.clientid) whmcsParams.client_id = params.clientid; 
     if (params.service_id) whmcsParams.service_id = params.service_id;
-    if (params.module) whmcsParams.sso_module = params.module; // WHMCS API uses sso_module
-    if (params.destination) whmcsParams.sso_destination = params.destination; // WHMCS API uses sso_destination
+    if (params.module) whmcsParams.sso_module = params.module; 
+    if (params.destination) whmcsParams.sso_destination = params.destination; 
 
 
     const data = await callWhmcsApi('CreateSsoToken', whmcsParams);
@@ -474,25 +477,117 @@ export const createSsoTokenWHMCS = async (
   }
 };
 
-// Mock API calls for pages that still directly import them (should be phased out)
-export const getInvoicesAPI = async (userId: string) => getInvoicesWHMCS(userId);
-export const getTicketsAPI = async (userId: string) => getTicketsWHMCS(userId);
-export const getTicketByIdAPI = async (userId: string, ticketId: string) => getTicketByIdWHMCS(ticketId); // Assuming userId is for auth context not direct param here
-export const replyToTicketAPI = async (userId: string, ticketId: string, message: string) => replyToTicketWHMCS({ clientid: userId, ticketid: ticketId, message });
-export const openTicketAPI = async (userId: string, ticketDetails: {subject: string, department: string, message: string, priority: 'Low' | 'Medium' | 'High'}) => {
-    // This is a placeholder. Department name needs to be mapped to department ID for WHMCS.
-    // You'll need a way to get department IDs, e.g., from GetSupportDepartments or hardcode them.
-    // For now, let's assume a mock department ID like '1' if 'Technical Support' is chosen.
-    let deptId = '1'; // Default mock
-    if (ticketDetails.department === "Billing") deptId = '2';
-    if (ticketDetails.department === "Sales") deptId = '3';
+export const addFundsWHMCS = async (
+  userId: string, 
+  amount: number, 
+  paymentMethodGateway: string // e.g., "paypal", "stripe"
+): Promise<{ result: 'success' | 'error'; message?: string; invoiceId?: string; paymentUrl?: string }> => {
+  try {
+    const invoiceParams = {
+      clientid: userId,
+      status: 'Unpaid', // The invoice needs to be paid to add funds
+      sendinvoice: true, // Optionally send invoice email to client
+      paymentmethod: paymentMethodGateway,
+      itemdescription1: `Add Funds - ${new Date().toISOString().split('T')[0]}`,
+      itemamount1: amount.toFixed(2),
+      itemtaxed1: 0, // Assuming funds added are not taxed, or tax setup handles this
+      // Might need 'applycredit: 0' if there are other credit handling specifics
+    };
 
-    return openTicketWHMCS({
-        clientid: userId,
-        deptid: deptId, // This needs to be a numeric department ID
-        subject: ticketDetails.subject,
-        message: ticketDetails.message,
-        priority: ticketDetails.priority
-    });
+    const invoiceData = await callWhmcsApi('AddInvoice', invoiceParams);
+
+    if (invoiceData.result === 'success' && invoiceData.invoiceid) {
+      // Construct the payment URL. This might vary based on WHMCS version / setup.
+      // It's generally the invoice view page where payment options are presented.
+      const paymentUrl = `${process.env.NEXT_PUBLIC_WHMCS_APP_URL || WHMCS_API_URL?.replace('/includes/api.php', '')}/viewinvoice.php?id=${invoiceData.invoiceid}`;
+      return { 
+        result: 'success', 
+        invoiceId: invoiceData.invoiceid.toString(),
+        paymentUrl: paymentUrl 
+      };
+    } else {
+      return { result: 'error', message: invoiceData.message || 'Failed to create invoice for adding funds.' };
+    }
+  } catch (error: any) {
+    return { result: 'error', message: (error instanceof Error ? error.message : String(error)) };
+  }
 };
+
+
+
+// Mock API calls for pages that still directly import them (should be phased out)
+// These direct API calls are only for client-side components that haven't been
+// refactored to use internal Next.js API routes yet.
+// Ideally, all WHMCS interactions should go through your Next.js backend API routes for security and consistency.
+
+// For BillingPage:
+export const getInvoicesAPI = async (userId: string, token?: string) => {
+  if (!token) throw new Error("Auth token required for getInvoicesAPI");
+  const response = await fetch('/api/data/invoices', { headers: { 'Authorization': `Bearer ${token}` }});
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.message || 'Failed to fetch invoices');
+  }
+  return response.json();
+};
+
+// For Support Pages:
+export const getTicketsAPI = async (userId: string, token?: string) => {
+  if (!token) throw new Error("Auth token required for getTicketsAPI");
+  const response = await fetch('/api/data/tickets', { headers: { 'Authorization': `Bearer ${token}` }});
+   if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.message || 'Failed to fetch tickets');
+  }
+  return response.json();
+};
+
+export const getTicketByIdAPI = async (ticketId: string, token?: string) => {
+  // This client-side direct call assumes ticketId is enough and auth is handled by the API route.
+  // The Next.js API route /api/data/ticket-details/[ticketId] would handle auth.
+  if (!token) throw new Error("Auth token required for getTicketByIdAPI");
+   const response = await fetch(`/api/data/ticket-details/${ticketId}`, { headers: { 'Authorization': `Bearer ${token}` }});
+   if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.message || 'Failed to fetch ticket details');
+  }
+  return response.json();
+  // Fallback if called without token, which shouldn't happen if pages are correctly using useAuth
+  // return getTicketByIdWHMCS(ticketId); // Original mock call
+};
+
+
+export const replyToTicketAPI = async (userId: string, ticketId: string, message: string, token?: string) => {
+  if (!token) throw new Error("Auth token required for replyToTicketAPI");
+   const response = await fetch(`/api/data/ticket-replies/${ticketId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ message, userId }), // userId might be redundant if token implies user
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.message || 'Failed to reply to ticket');
+  }
+  return response.json();
+  // Fallback if called without token
+  // return replyToTicketWHMCS({ clientid: userId, ticketid: ticketId, message });
+};
+
+export const openTicketAPI = async (userId: string, ticketDetails: {subject: string, department: string, message: string, priority: 'Low' | 'Medium' | 'High'}, token?: string) => {
+  if (!token) throw new Error("Auth token required for openTicketAPI");
+  // The department name needs to be mapped to a department ID for WHMCS.
+  // This mapping should ideally happen on the server-side in the API route.
+  // For now, the API route will handle this logic.
+  const response = await fetch('/api/data/tickets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ ...ticketDetails, userId }), // userId might be redundant
+  });
+   if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.message || 'Failed to open ticket');
+  }
+  return response.json();
+};
+
 
