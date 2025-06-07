@@ -2,14 +2,12 @@
 "use client";
 
 import type { User } from '@/types';
-// API functions will now point to the (modified) whmcs-mock-api.ts which contains live calls
-import { validateLoginAPI, addClientAPI, getUserDetailsAPI } from '@/lib/whmcs-mock-api';
 import { useRouter, usePathname } from 'next/navigation';
 import React, { createContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
+  token: string | null; // This will be the placeholder token like "mock-jwt-token-for-USERID"
   login: (email: string, password: string) => Promise<void>;
   register: (userData: Omit<User, 'id'> & {password: string}) => Promise<void>;
   logout: () => void;
@@ -26,57 +24,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
 
-  const fetchUserFromToken = useCallback(async (storedToken: string) => {
+  const fetchUserWithToken = useCallback(async (storedToken: string) => {
     setIsLoading(true);
-    // This token is now a placeholder like "whmcs-session-for-USERID"
-    // or "mock-jwt-token-for-USERID" if login was successful
-    const userIdPrefix = "whmcs-session-for-"; // Or your chosen prefix
-    const mockJwtPrefix = "mock-jwt-token-for-";
+    try {
+      const response = await fetch('/api/auth/user', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${storedToken}`,
+        },
+      });
 
-    let userId: string | null = null;
-
-    if (storedToken.startsWith(userIdPrefix)) {
-      userId = storedToken.replace(userIdPrefix, '');
-    } else if (storedToken.startsWith(mockJwtPrefix)) {
-      userId = storedToken.replace(mockJwtPrefix, '');
-    }
-    
-    if (userId) {
-      try {
-        const { user: fetchedUser } = await getUserDetailsAPI(userId);
-        if (fetchedUser) {
-          setUser(fetchedUser);
-          setToken(storedToken); // Keep the same placeholder token
-        } else {
-          localStorage.removeItem('authToken');
-          setUser(null);
-          setToken(null);
-        }
-      } catch (error) {
-        console.error("Error fetching user details from token:", error);
-        localStorage.removeItem('authToken');
-        setUser(null);
-        setToken(null);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+        throw new Error(errorData.message || `Failed to fetch user details: ${response.statusText}`);
       }
-    } else {
-        localStorage.removeItem('authToken');
-        setUser(null);
-        setToken(null);
-    }
-    setIsLoading(false);
-  }, []);
 
+      const data = await response.json();
+      if (data.user) {
+        setUser(data.user);
+        setToken(storedToken); // Keep the original placeholder token
+      } else {
+        throw new Error('User data not found in response');
+      }
+    } catch (error) {
+      console.error("Error fetching user with token:", error);
+      localStorage.removeItem('authToken');
+      setUser(null);
+      setToken(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('authToken');
     if (storedToken) {
-      fetchUserFromToken(storedToken);
+      fetchUserWithToken(storedToken);
     } else {
-      setIsLoading(false);
+      setIsLoading(false); // No token, so not loading user data
     }
-  }, [fetchUserFromToken]);
+  }, [fetchUserWithToken]);
 
   useEffect(() => {
+    // Only redirect if not loading, no user, and not on public auth pages or root
     if (!isLoading && !user && !pathname.startsWith('/login') && !pathname.startsWith('/register') && pathname !== '/') {
       router.push('/login');
     }
@@ -85,24 +75,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Call validateLoginAPI which now interacts with live WHMCS
-      // It expects the raw password.
-      const response = await validateLoginAPI(email, password);
-      if (response.result === 'success' && response.userId) {
-        // Fetch full user details using the userId from WHMCS
-        const userDetailsResponse = await getUserDetailsAPI(response.userId);
-        if (userDetailsResponse.user) {
-          setUser(userDetailsResponse.user);
-          // Create a placeholder token. In production, your backend might issue a real JWT/session here.
-          const sessionToken = `mock-jwt-token-for-${response.userId}`;
-          setToken(sessionToken);
-          localStorage.setItem('authToken', sessionToken);
-          router.push('/dashboard');
-        } else {
-          throw new Error('Failed to fetch user details after login.');
-        }
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      if (data.user && data.token) {
+        setUser(data.user);
+        setToken(data.token); // This is the placeholder token like "mock-jwt-token-for-USERID"
+        localStorage.setItem('authToken', data.token);
+        router.push('/dashboard');
       } else {
-        throw new Error(response.message || 'Login failed');
+        throw new Error(data.message || 'Login response missing user or token.');
       }
     } catch (error) {
       setUser(null);
@@ -117,15 +108,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async (userData: Omit<User, 'id'> & {password: string}) => {
     setIsLoading(true);
     try {
-      // Pass all data including password to addClientAPI.
-      // WHMCS's AddClient API handles password hashing.
-      const response = await addClientAPI(userData);
-      if (response.result === 'success' && response.userId) {
-        // Registration successful, redirect to login
-        router.push('/login');
-      } else {
-        throw new Error(response.message || 'Registration failed');
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
       }
+      // Registration successful, now redirect to login
+      router.push('/login');
     } catch (error) {
       throw error; // Re-throw to be caught by RegisterForm
     } finally {
@@ -147,3 +142,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+    

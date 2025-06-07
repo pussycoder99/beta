@@ -6,11 +6,13 @@ import { useAuth } from '@/hooks/use-auth';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell, CreditCard, Globe, Server, ShieldAlert, Ticket as TicketIcon } from 'lucide-react';
+import { Bell, CreditCard, Globe, Server, ShieldAlert, Ticket as TicketIcon, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import type { Service, Invoice, Ticket, Domain } from '@/types';
-import { getClientsProductsAPI, getInvoicesAPI, getTicketsAPI, getDomainsAPI } from '@/lib/whmcs-mock-api';
+// Removed direct imports from whmcs-mock-api
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+
 
 interface DashboardStats {
   activeServices: number;
@@ -21,23 +23,38 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [upcomingRenewals, setUpcomingRenewals] = useState<Service[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [recentTickets, setRecentTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && token) {
       const fetchData = async () => {
         setIsLoading(true);
         try {
+          const fetchFromApi = async (endpoint: string, currentToken: string) => {
+            const response = await fetch(endpoint, {
+              headers: {
+                'Authorization': `Bearer ${currentToken}`,
+              },
+            });
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ message: `Failed to parse error from ${endpoint}` }));
+              console.error(`Error fetching from ${endpoint}: ${response.status}`, errorData);
+              throw new Error(errorData.message || `Failed to fetch from ${endpoint}: ${response.statusText}`);
+            }
+            return response.json();
+          };
+          
           const [servicesData, invoicesData, ticketsData, domainsData] = await Promise.all([
-            getClientsProductsAPI(user.id),
-            getInvoicesAPI(user.id),
-            getTicketsAPI(user.id),
-            getDomainsAPI(user.id),
+            fetchFromApi('/api/data/services', token),
+            fetchFromApi('/api/data/invoices', token),
+            fetchFromApi('/api/data/tickets', token),
+            fetchFromApi('/api/data/domains', token),
           ]);
 
           const activeServices = servicesData.services.filter(s => s.status === 'Active').length;
@@ -66,13 +83,23 @@ export default function DashboardPage() {
           });
         } catch (error) {
           console.error("Failed to fetch dashboard data", error);
+          toast({
+            title: 'Error Loading Dashboard',
+            description: (error instanceof Error ? error.message : 'Could not load dashboard data.'),
+            variant: 'destructive',
+          });
         } finally {
           setIsLoading(false);
         }
       };
       fetchData();
+    } else if (!token && user?.id) {
+        setIsLoading(false); // Not attempting to load if token is missing but user object exists
+        console.warn("Dashboard: User present but token is missing. Data fetching skipped.");
+    } else {
+        setIsLoading(false); // Not loading if no user or no token
     }
-  }, [user?.id]);
+  }, [user?.id, token, toast]);
 
   if (isLoading) {
     return (
@@ -105,6 +132,15 @@ export default function DashboardPage() {
       </CardContent>
     </Card>
   );
+
+  if (!user) {
+     return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Authenticating...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -159,7 +195,7 @@ export default function DashboardPage() {
                       <p className="text-sm text-muted-foreground">Due: {service.nextDueDate} - {service.amount}</p>
                     </div>
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/services/${service.id}`}>Renew</Link>
+                      <Link href={`/services`}>Renew</Link> {/* Simplified link to services page */}
                     </Button>
                   </li>
                 ))}
@@ -188,7 +224,7 @@ export default function DashboardPage() {
                       </p>
                     </div>
                      <Button variant={invoice.status === 'Overdue' ? 'destructive' : 'outline'} size="sm" asChild>
-                      <Link href={`/billing`}>Pay Now</Link> {/* Simplified link to billing page */}
+                      <Link href={`/billing`}>Pay Now</Link>
                     </Button>
                   </li>
                 ))}
@@ -220,4 +256,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
