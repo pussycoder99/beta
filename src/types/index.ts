@@ -94,17 +94,8 @@ export interface ProductGroup {
   headline?: string;
   tagline?: string;
   order: number;
-  // Add other fields as returned by WHMCS GetProductGroups
 }
 
-// Represents the pricing for a single currency and cycle
-export interface ProductPrice {
-  cycle: string; // e.g., 'monthly', 'annually', 'biennially'
-  price: string; // e.g., "10.00"
-  setupfee: string; // e.g., "0.00"
-}
-
-// Pricing details for a product, keyed by currency code
 export interface ProductPricing {
   [currencyCode: string]: {
     prefix: string;
@@ -124,24 +115,29 @@ export interface ProductPricing {
   };
 }
 
+// This represents a more abstract view of features for display,
+// but GetProducts returns customfields and configoptions directly.
+// For the order page, we will primarily rely on the product's main description.
 export interface ProductFeature {
-  [featureName: string]: string; // WHMCS often returns features as key-value pairs
+  [featureName: string]: string; 
 }
 
 
 export interface Product {
   pid: string;
   gid: string;
-  type: string; // e.g., 'hostingaccount', 'reselleraccount', 'server', 'other'
+  type: string; 
   name: string;
+  slug?: string; // Added from WHMCS GetProducts API example
+  "product-url"?: string; // Added from WHMCS GetProducts API example
   description: string; // HTML content
-  module: string; // Server module, e.g., 'cpanel', 'plesk'
+  module: string; 
   paytype: 'free' | 'onetime' | 'recurring';
-  pricing: ProductPricing; // Complex object, see WHMCS GetProducts API response
-  features?: ProductFeature; // Features array/object from WHMCS (e.g. disk space, bandwidth)
-  // Store a more structured simple price for display
-  displayPrice?: string; // e.g., "$10.00/month"
-  featureDescription?: string[]; // Parsed features for easier display
-  // Add other fields as needed from WHMCS GetProducts response
-  // e.g., hidden, showdomainoptions, welcomeemail, stockcontrol, qty, etc.
+  pricing: ProductPricing; 
+  // Custom fields and config options can be complex; for now, focusing on main description
+  // features?: ProductFeature; // Simplified: rely on description
+  displayPrice?: string; 
+  allowqty?: number; // Added from WHMCS GetProducts API example
+  quantity_available?: number; // Added from WHMCS GetProducts API example
+  // customfields and configoptions are available in the raw WHMCS data if needed for deep parsing
 }

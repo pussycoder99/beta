@@ -70,17 +70,8 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
 export const validateLoginWHMCS = async (email: string, passwordAttempt: string): Promise<{ result: 'success' | 'error'; message?: string; userid?: string, passwordhash?: string, twoFactorEnabled?: boolean }> => {
   const directFormData = new URLSearchParams();
   directFormData.append('action', 'ValidateLogin');
-  
-  // Add API authentication credentials if they exist
-  if (WHMCS_API_IDENTIFIER && WHMCS_API_SECRET) {
-    // Using 'username' and 'password' as per WHMCS docs for API call authentication
-    directFormData.append('username', WHMCS_API_IDENTIFIER); 
-    directFormData.append('password', WHMCS_API_SECRET);   
-  } else {
-    console.warn("[WHMCS API SERVER WARN] Missing WHMCS_API_IDENTIFIER or WHMCS_API_SECRET for ValidateLogin API authentication. This might be okay if not required by your WHMCS setup for this specific action.");
-    // Proceeding without them, as ValidateLogin might sometimes work without API user auth depending on setup
-  }
-  
+  directFormData.append('username', WHMCS_API_IDENTIFIER!); 
+  directFormData.append('password', WHMCS_API_SECRET!);   
   directFormData.append('email', email); 
   directFormData.append('password2', passwordAttempt); 
   directFormData.append('responsetype', 'json');
@@ -380,8 +371,6 @@ export const getTicketByIdWHMCS = async (ticketId: string): Promise<{ ticket?: T
   }
 };
 
-// Mapping for department names to IDs - this is an example.
-// You'll need to get the actual IDs from your WHMCS setup (Setup > Support > Support Departments)
 const departmentNameToIdMap: Record<string, string> = {
   "Technical Support": "1",
   "Billing": "2",
@@ -531,56 +520,40 @@ export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[],
   }
 };
 
-
-// Helper to extract a simple display price (e.g., monthly)
 const getDisplayPrice = (pricing: ProductPricing, currencyCode: string = 'USD'): string => {
   const currencyPricing = pricing[currencyCode];
-  if (!currencyPricing) return "N/A";
+  if (!currencyPricing) return "Contact Us";
 
-  // Prioritize monthly, then quarterly, then annually, etc.
   const cycles = ['monthly', 'quarterly', 'annually', 'biennially', 'triennially'];
-  let displayPrice = "N/A";
-  let cycleName = "";
+  let displayPriceStr = "Contact Us";
+  let foundPrice = false;
 
   for (const cycle of cycles) {
-    if (currencyPricing[cycle as keyof typeof currencyPricing] && parseFloat(currencyPricing[cycle as keyof typeof currencyPricing] as string) >= 0) {
-      // Check if it's a valid price (not -1.00 which WHMCS uses for "not available")
-      const priceValue = parseFloat(currencyPricing[cycle as keyof typeof currencyPricing] as string);
-      if (priceValue >= 0) {
-         displayPrice = `${currencyPricing.prefix}${priceValue.toFixed(2)}`;
-         cycleName = cycle.charAt(0).toUpperCase() + cycle.slice(1);
-         if (cycle === 'monthly') cycleName = "/mo";
-         else if (cycle === 'annually') cycleName = "/yr";
-         else if (cycle === 'quarterly') cycleName = "/qtr";
-         // Add more abbreviations if needed
-         break;
+    const priceKey = cycle as keyof typeof currencyPricing;
+    if (currencyPricing[priceKey] && typeof currencyPricing[priceKey] === 'string') {
+      const priceValue = parseFloat(currencyPricing[priceKey] as string);
+      if (priceValue >= 0) { // -1.00 often means not available for that cycle
+        let cycleName = cycle.charAt(0).toUpperCase() + cycle.slice(1);
+        if (cycle === 'monthly') cycleName = "/mo";
+        else if (cycle === 'annually') cycleName = "/yr";
+        else if (cycle === 'quarterly') cycleName = "/qtr";
+        else if (cycle === 'semiannually') cycleName = "/s-yr";
+        else if (cycle === 'biennially') cycleName = "/2yrs";
+        else if (cycle === 'triennially') cycleName = "/3yrs";
+        
+        displayPriceStr = `${currencyPricing.prefix}${priceValue.toFixed(2)} ${currencyPricing.suffix} ${cycleName}`;
+        foundPrice = true;
+        break; 
       }
     }
   }
-  return displayPrice !== "N/A" ? `${displayPrice} ${currencyPricing.suffix} ${cycleName}` : "Contact Us";
-};
-
-
-// Helper to parse features
-const parseFeatures = (features: any): ProductFeature | undefined => {
-    if (!features) return undefined;
-    if (Array.isArray(features.feature)) { // When features are an array of {name: string, value: string}
-        const parsed: ProductFeature = {};
-        features.feature.forEach((f: {name: string, value: string}) => {
-            parsed[f.name] = f.value;
-        });
-        return parsed;
-    }
-    if (typeof features === 'object' && !Array.isArray(features)) { // When features is an object of key-value pairs
-        return features as ProductFeature;
-    }
-    return undefined;
+  return displayPriceStr;
 };
 
 
 export const getProductsWHMCS = async (gid?: string): Promise<{ products: Product[], whmcsData?: any }> => {
   try {
-    const params: Record<string, any> = { include_features: true };
+    const params: Record<string, any> = { }; // Removed include_features as GetProducts doesn't use it.
     if (gid) {
       params.gid = gid;
     }
@@ -591,23 +564,21 @@ export const getProductsWHMCS = async (gid?: string): Promise<{ products: Produc
       const productsArray = Array.isArray(data.products.product) ? data.products.product : [data.products.product];
       products = productsArray.map((p: any) => {
         const pricing = p.pricing as ProductPricing;
-        const features = parseFeatures(p.features);
-        const featureDescription = features 
-          ? Object.entries(features).map(([key, value]) => `${key}: ${value}`) 
-          : [];
-
+        
         return {
           pid: p.pid.toString(),
           gid: p.gid.toString(),
           type: p.type,
           name: p.name,
-          description: p.description, // HTML
+          slug: p.slug,
+          "product-url": p['product-url'],
+          description: p.description, 
           module: p.module,
           paytype: p.paytype,
           pricing: pricing,
-          features: features,
-          displayPrice: getDisplayPrice(pricing), // Use a primary currency like USD by default
-          featureDescription: featureDescription,
+          displayPrice: getDisplayPrice(pricing, p.pricing ? Object.keys(p.pricing)[0] : 'USD'), // Attempt to use first available currency or default
+          allowqty: p.allowqty,
+          quantity_available: p.quantity_available
         };
       });
     } else if (data.result !== 'success') {
@@ -683,4 +654,3 @@ export const openTicketAPI = async (userId: string, ticketDetails: {subject: str
   }
   return response.json();
 };
-

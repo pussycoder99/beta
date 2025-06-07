@@ -22,7 +22,6 @@ export default function OrderServicePage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Fetch product groups
     setIsLoadingGroups(true);
     fetch('/api/data/product-groups', {
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},
@@ -34,26 +33,33 @@ export default function OrderServicePage() {
       .then(data => {
         if (data.groups) {
           setProductGroups(data.groups);
-          // Optionally select the first group by default
           if (data.groups.length > 0 && !selectedGroupId) {
-            // setSelectedGroupId(data.groups[0].id); // Auto-select first group
+            setSelectedGroupId(data.groups[0].id); // Auto-select first group
+          } else if (data.groups.length === 0) {
+            setSelectedGroupId(null); // Ensure no group is selected if none exist
+            setProducts([]);
           }
         } else {
           setProductGroups([]);
+          setSelectedGroupId(null);
+          setProducts([]);
           toast({ title: 'Error', description: data.message || 'Could not load product categories.', variant: 'destructive'});
         }
       })
       .catch(error => {
         console.error("Error fetching product groups:", error);
         toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
+        setProductGroups([]);
+        setSelectedGroupId(null);
+        setProducts([]);
       })
       .finally(() => setIsLoadingGroups(false));
-  }, [token, toast]);
+  }, [token, toast]); // Removed selectedGroupId from dependencies to avoid re-fetching groups on tab change
 
   useEffect(() => {
     if (selectedGroupId) {
       setIsLoadingProducts(true);
-      setProducts([]); // Clear previous products
+      setProducts([]); 
       fetch(`/api/data/products?gid=${selectedGroupId}`, {
          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       })
@@ -72,21 +78,24 @@ export default function OrderServicePage() {
         .catch(error => {
           console.error(`Error fetching products for group ${selectedGroupId}:`, error);
           toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
+          setProducts([]);
         })
         .finally(() => setIsLoadingProducts(false));
+    } else {
+      // If no group is selected (e.g., no groups available), ensure products are cleared
+      setProducts([]);
+      setIsLoadingProducts(false);
     }
   }, [selectedGroupId, token, toast]);
 
   const handleOrderNow = (productId: string, productName: string) => {
-    // In a real app, this would redirect to WHMCS cart or a more detailed product config page
-    // e.g., window.open(`https://portal.snbdhost.com/cart.php?a=add&pid=${productId}`, '_blank');
     toast({
       title: 'Order Initiated (Mock)',
       description: `Adding ${productName} (ID: ${productId}) to cart. You would be redirected to WHMCS.`,
     });
   };
 
-  if (isLoadingGroups) {
+  if (isLoadingGroups && productGroups.length === 0) { // Show main loader only if groups haven't loaded at all
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
@@ -115,19 +124,23 @@ export default function OrderServicePage() {
         </Button>
       </div>
       
-      {productGroups.length === 0 && !isLoadingGroups && (
+      {!isLoadingGroups && productGroups.length === 0 && (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2"><AlertTriangle className="text-yellow-500"/>No Product Categories Found</CardTitle>
             </CardHeader>
             <CardContent>
-                <p className="text-muted-foreground">We couldn&apos;t find any product categories at the moment. Please try again later or contact support.</p>
+                <p className="text-muted-foreground">We couldn&apos;t find any product categories at the moment. Please check back later or contact support if this issue persists.</p>
             </CardContent>
         </Card>
       )}
 
       {productGroups.length > 0 && (
-        <Tabs defaultValue={selectedGroupId || productGroups[0]?.id} onValueChange={setSelectedGroupId} className="w-full">
+        <Tabs 
+            value={selectedGroupId || (productGroups[0] ? productGroups[0].id : '')} // Ensure value is always a string
+            onValueChange={setSelectedGroupId} 
+            className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
             {productGroups.map(group => (
               <TabsTrigger key={group.id} value={group.id} className="text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -178,16 +191,6 @@ export default function OrderServicePage() {
                       <CardContent className="flex-grow space-y-3">
                         {product.description && (
                            <div className="text-sm text-muted-foreground prose prose-sm dark:prose-invert max-h-24 overflow-y-auto" dangerouslySetInnerHTML={{ __html: product.description }} />
-                        )}
-                        {product.featureDescription && product.featureDescription.length > 0 && (
-                          <ul className="space-y-1 text-sm mt-2">
-                            {product.featureDescription.slice(0, 4).map((feature, idx) => ( // Limit to 4 features for brevity
-                              <li key={idx} className="flex items-center">
-                                <CheckCircle className="h-4 w-4 mr-2 text-green-500 shrink-0" />
-                                <span>{feature}</span>
-                              </li>
-                            ))}
-                          </ul>
                         )}
                          <p className="text-2xl font-bold text-foreground pt-2">{product.displayPrice}</p>
                       </CardContent>
