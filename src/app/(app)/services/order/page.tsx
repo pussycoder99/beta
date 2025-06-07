@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 
 export default function OrderServicePage() {
-  const { user, token } = useAuth();
+  const { token } = useAuth(); 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -33,11 +33,11 @@ export default function OrderServicePage() {
       .then(data => {
         if (data.groups) {
           setProductGroups(data.groups);
-          if (data.groups.length > 0 && !selectedGroupId) {
-            setSelectedGroupId(data.groups[0].id); // Auto-select first group
+          if (data.groups.length > 0 && !selectedGroupId) { 
+            setSelectedGroupId(data.groups[0].id);
           } else if (data.groups.length === 0) {
-            setSelectedGroupId(null); // Ensure no group is selected if none exist
-            setProducts([]);
+            setSelectedGroupId(null); 
+            setProducts([]); 
           }
         } else {
           setProductGroups([]);
@@ -54,7 +54,7 @@ export default function OrderServicePage() {
         setProducts([]);
       })
       .finally(() => setIsLoadingGroups(false));
-  }, [token, toast]); // Removed selectedGroupId from dependencies to avoid re-fetching groups on tab change
+  }, [token, toast]); // Only re-fetch groups if token changes or on initial load
 
   useEffect(() => {
     if (selectedGroupId) {
@@ -82,7 +82,6 @@ export default function OrderServicePage() {
         })
         .finally(() => setIsLoadingProducts(false));
     } else {
-      // If no group is selected (e.g., no groups available), ensure products are cleared
       setProducts([]);
       setIsLoadingProducts(false);
     }
@@ -95,7 +94,7 @@ export default function OrderServicePage() {
     });
   };
 
-  if (isLoadingGroups && productGroups.length === 0) { // Show main loader only if groups haven't loaded at all
+  if (isLoadingGroups && productGroups.length === 0) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
@@ -130,18 +129,18 @@ export default function OrderServicePage() {
                 <CardTitle className="flex items-center gap-2"><AlertTriangle className="text-yellow-500"/>No Product Categories Found</CardTitle>
             </CardHeader>
             <CardContent>
-                <p className="text-muted-foreground">We couldn&apos;t find any product categories at the moment. Please check back later or contact support if this issue persists.</p>
+                <p className="text-muted-foreground">We couldn&apos;t find any product categories at the moment. This might be due to a configuration issue or no products being available. Please check your server logs for more details from the WHMCS API, or contact support if this issue persists.</p>
             </CardContent>
         </Card>
       )}
 
       {productGroups.length > 0 && (
         <Tabs 
-            value={selectedGroupId || (productGroups[0] ? productGroups[0].id : '')} // Ensure value is always a string
+            value={selectedGroupId || (productGroups[0] ? productGroups[0].id : '')} 
             onValueChange={setSelectedGroupId} 
             className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
             {productGroups.map(group => (
               <TabsTrigger key={group.id} value={group.id} className="text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 {group.name}

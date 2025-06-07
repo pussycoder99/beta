@@ -1,5 +1,5 @@
 
-import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, ProductFeature } from '@/types';
+import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing } from '@/types';
 import { format } from 'date-fns';
 
 const WHMCS_API_URL = process.env.NEXT_PUBLIC_WHMCS_API_URL;
@@ -15,8 +15,8 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
 
   const formData = new URLSearchParams();
   formData.append('action', action);
-  formData.append('identifier', WHMCS_API_IDENTIFIER); 
-  formData.append('secret', WHMCS_API_SECRET);     
+  formData.append('identifier', WHMCS_API_IDENTIFIER);
+  formData.append('secret', WHMCS_API_SECRET);
   formData.append('responsetype', 'json');
 
   for (const key in params) {
@@ -30,7 +30,7 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
     const response = await fetch(WHMCS_API_URL, {
       method: 'POST',
       body: formData,
-      cache: 'no-store', 
+      cache: 'no-store',
     });
 
     const rawResponseText = await response.text();
@@ -52,8 +52,8 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
 
     const data = JSON.parse(rawResponseText);
     // console.log(`[WHMCS API SERVER DEBUG] Parsed Response Data for ${action}:`, data);
-    
-    if (data.result === 'error' && action !== 'ValidateLogin') { 
+
+    if (data.result === 'error' && action !== 'ValidateLogin') {
       console.error(`[WHMCS API SERVER ERROR] WHMCS API Error for action ${action}:`, data.message);
       throw new Error(data.message || `WHMCS API error for action ${action}.`);
     }
@@ -70,19 +70,19 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
 export const validateLoginWHMCS = async (email: string, passwordAttempt: string): Promise<{ result: 'success' | 'error'; message?: string; userid?: string, passwordhash?: string, twoFactorEnabled?: boolean }> => {
   const directFormData = new URLSearchParams();
   directFormData.append('action', 'ValidateLogin');
-  directFormData.append('username', WHMCS_API_IDENTIFIER!); 
-  directFormData.append('password', WHMCS_API_SECRET!);   
-  directFormData.append('email', email); 
-  directFormData.append('password2', passwordAttempt); 
+  directFormData.append('username', WHMCS_API_IDENTIFIER!);
+  directFormData.append('password', WHMCS_API_SECRET!);
+  directFormData.append('email', email);
+  directFormData.append('password2', passwordAttempt);
   directFormData.append('responsetype', 'json');
-  
+
 
   console.log(`[WHMCS API SERVER DEBUG] Attempting ValidateLogin action (direct)`);
   console.log(`[WHMCS API SERVER DEBUG] Target URL: ${WHMCS_API_URL}`);
   console.log(`[WHMCS API SERVER DEBUG] ValidateLogin FormData to be sent:`);
   for (const [key, value] of directFormData.entries()) {
     if (key.toLowerCase().includes('password') || key.toLowerCase().includes('secret') || key.toLowerCase() === 'password2') {
-      console.log(`  ${key}: ********`); 
+      console.log(`  ${key}: ********`);
     } else {
       console.log(`  ${key}: ${value}`);
     }
@@ -115,11 +115,11 @@ export const validateLoginWHMCS = async (email: string, passwordAttempt: string)
     console.log(`[WHMCS API SERVER DEBUG] Parsed Response Data for ValidateLogin (direct):`, data);
 
     if (data.result === 'success' && data.userid) {
-      return { 
-        result: 'success', 
-        userid: data.userid.toString(), 
-        passwordhash: data.passwordhash, 
-        twoFactorEnabled: data.twoFactorEnabled === "true" || data.twoFactorEnabled === true 
+      return {
+        result: 'success',
+        userid: data.userid.toString(),
+        passwordhash: data.passwordhash,
+        twoFactorEnabled: data.twoFactorEnabled === "true" || data.twoFactorEnabled === true
       };
     }
     return { result: 'error', message: data.message || 'Authentication failed: Unknown reason from WHMCS.' };
@@ -141,7 +141,7 @@ export const addClientWHMCS = async (clientData: Omit<User, 'id'> & {password?: 
       city: clientData.city || '',
       state: clientData.state || '',
       postcode: clientData.postcode || '',
-      country: clientData.country || '', 
+      country: clientData.country || '',
       phonenumber: clientData.phoneNumber || '',
     };
     const data = await callWhmcsApi('AddClient', params);
@@ -157,7 +157,7 @@ export const addClientWHMCS = async (clientData: Omit<User, 'id'> & {password?: 
 export const getUserDetailsWHMCS = async (userId: string): Promise<{ user?: User, whmcsData?: any }> => {
   try {
     const data = await callWhmcsApi('GetClientsDetails', { clientid: userId, stats: false });
-    if (data.result === 'success' && data.client) { 
+    if (data.result === 'success' && data.client) {
       const client = data.client;
       const user: User = {
         id: client.id?.toString() || client.userid?.toString() || client.clientid?.toString() || userId,
@@ -169,7 +169,7 @@ export const getUserDetailsWHMCS = async (userId: string): Promise<{ user?: User
         city: client.city,
         state: client.state,
         postcode: client.postcode,
-        country: client.countrycode || client.country, 
+        country: client.countrycode || client.country,
         phoneNumber: client.phonenumber || client.telephone,
       };
       return { user, whmcsData: client };
@@ -185,21 +185,21 @@ export const getUserDetailsWHMCS = async (userId: string): Promise<{ user?: User
 
 export const getClientsProductsWHMCS = async (userId: string, serviceId?: string): Promise<{ services: Service[], whmcsData?: any }> => {
   try {
-    const params: Record<string, any> = { clientid: userId, stats: true }; 
+    const params: Record<string, any> = { clientid: userId, stats: true };
     if (serviceId) {
       params.serviceid = serviceId;
     }
-    const data = await callWhmcsApi('GetClientsProducts', params); 
+    const data = await callWhmcsApi('GetClientsProducts', params);
     let services: Service[] = [];
-    
+
     if (data.result === 'success' && data.products?.product) {
       const productsArray = Array.isArray(data.products.product) ? data.products.product : [data.products.product];
       const currency = data.currency || { code: productsArray[0]?.currencycode || 'USD', suffix: productsArray[0]?.currencysuffix || 'USD', prefix: productsArray[0]?.currencyprefix || '$' };
-      
+
       services = productsArray.map((p: any) => ({
           id: p.id.toString(),
-          name: p.name || p.productinfo?.name || p.productname, 
-          status: p.status as ServiceStatus, 
+          name: p.name || p.productinfo?.name || p.productname,
+          status: p.status as ServiceStatus,
           registrationDate: p.regdate,
           nextDueDate: p.nextduedate,
           billingCycle: p.billingcycle,
@@ -209,12 +209,12 @@ export const getClientsProductsWHMCS = async (userId: string, serviceId?: string
           disklimit: p.disklimit,
           bwusage: p.bwusage,
           bwlimit: p.bwlimit,
-          lastupdate: p.lastupdate, 
-          serverInfo: { 
+          lastupdate: p.lastupdate,
+          serverInfo: {
             hostname: p.serverhostname,
             ipAddress: p.serverip,
           },
-          username: p.username 
+          username: p.username
       }));
     } else if (data.result !== 'success') {
         console.warn(`[WHMCS API SERVER WARN] GetClientsProducts for user ${userId} ${serviceId ? `service ${serviceId}` : ''} API call failed. Data:`, data);
@@ -236,12 +236,12 @@ export const getDomainsWHMCS = async (userId: string): Promise<{ domains: Domain
       const domainsArray = Array.isArray(data.domains.domain) ? data.domains.domain : [data.domains.domain];
       domains = domainsArray.map((d: any) => ({
           id: d.id.toString(),
-          domainName: d.domain, 
+          domainName: d.domain,
           status: d.status as DomainStatus,
           registrationDate: d.regdate || d.registrationdate,
-          expiryDate: d.nextduedate || d.expirydate, 
+          expiryDate: d.nextduedate || d.expirydate,
           registrar: d.registrar,
-          nameservers: [d.ns1, d.ns2, d.ns3, d.ns4, d.ns5].filter(Boolean) 
+          nameservers: [d.ns1, d.ns2, d.ns3, d.ns4, d.ns5].filter(Boolean)
       }));
     } else if (data.result !== 'success') {
         console.warn(`[WHMCS API SERVER WARN] GetClientsDomains for user ${userId} API call failed. Data:`, data);
@@ -258,18 +258,18 @@ export const getDomainsWHMCS = async (userId: string): Promise<{ domains: Domain
 export const getInvoicesWHMCS = async (userId: string, statusFilter?: InvoiceStatus, limit: number = 50): Promise<{ invoices: Invoice[], whmcsData?: any }> => {
   try {
     const params: Record<string, any> = { userid: userId, limitnum: limit, orderby: 'duedate', order: 'DESC' };
-    if (statusFilter && statusFilter !== "Overdue") { 
+    if (statusFilter && statusFilter !== "Overdue") {
         params.status = statusFilter;
     } else if (statusFilter === "Overdue") {
-        params.status = "Unpaid"; 
+        params.status = "Unpaid";
     }
-    
+
     const invData = await callWhmcsApi('GetInvoices', params);
-    
+
     let invoices: Invoice[] = [];
-    
+
     if (invData.result === 'success' && invData.invoices?.invoice) {
-      const defaultCurrency = { code: 'USD', suffix: 'USD', prefix: '$' }; 
+      const defaultCurrency = { code: 'USD', suffix: 'USD', prefix: '$' };
       const currency = invData.currency || defaultCurrency;
       const invoicesArray = Array.isArray(invData.invoices.invoice) ? invData.invoices.invoice : [invData.invoices.invoice];
       invoices = invoicesArray.map((inv: any) => ({
@@ -278,8 +278,8 @@ export const getInvoicesWHMCS = async (userId: string, statusFilter?: InvoiceSta
           dateCreated: inv.date,
           dueDate: inv.duedate,
           total: `${inv.currencyprefix || currency.prefix}${inv.total} ${inv.currencycode || currency.code}`,
-          status: inv.status as InvoiceStatus, 
-          items: inv.items?.item ? 
+          status: inv.status as InvoiceStatus,
+          items: inv.items?.item ?
                  (Array.isArray(inv.items.item) ? inv.items.item : [inv.items.item]).map((it: any) => ({
                     description: it.description,
                     amount: `${inv.currencyprefix || currency.prefix}${it.amount} ${inv.currencycode || currency.code}`
@@ -302,18 +302,18 @@ export const getTicketsWHMCS = async (userId: string, statusFilter: string = 'Al
     const params: Record<string, any> = { clientid: userId, limitnum: 50 };
     if (statusFilter && statusFilter !== 'All Active' && statusFilter !== 'All') {
         params.status = statusFilter;
-    } 
+    }
     const data = await callWhmcsApi('GetTickets', params);
     let tickets: Ticket[] = [];
     if (data.result === 'success' && data.tickets?.ticket) {
         const ticketsArray = Array.isArray(data.tickets.ticket) ? data.tickets.ticket : [data.tickets.ticket];
         tickets = ticketsArray.map((t: any) => ({
-            id: t.id.toString(), 
-            ticketNumber: t.tid, 
+            id: t.id.toString(),
+            ticketNumber: t.tid,
             subject: t.subject,
             department: t.deptname || t.departmentname,
             status: t.status as TicketStatus,
-            lastUpdated: t.lastreply.includes('0000-00-00') ? t.date : t.lastreply, 
+            lastUpdated: t.lastreply.includes('0000-00-00') ? t.date : t.lastreply,
             dateOpened: t.date,
             priority: t.priority as 'Low' | 'Medium' | 'High',
         }));
@@ -336,14 +336,14 @@ export const getTicketsWHMCS = async (userId: string, statusFilter: string = 'Al
 
 export const getTicketByIdWHMCS = async (ticketId: string): Promise<{ ticket?: Ticket, whmcsData?: any }> => {
   try {
-    const data = await callWhmcsApi('GetTicket', { ticketid: ticketId }); 
-    
+    const data = await callWhmcsApi('GetTicket', { ticketid: ticketId });
+
     if (data.result === 'success') {
-      const repliesData = data.replies?.reply ? 
+      const repliesData = data.replies?.reply ?
         (Array.isArray(data.replies.reply) ? data.replies.reply : [data.replies.reply]) : [];
-      
+
       const replies: TicketReply[] = repliesData.map((r: any) => ({
-          id: r.replyid?.toString() || r.id?.toString() || `reply-${Math.random().toString(36).substr(2, 9)}`, 
+          id: r.replyid?.toString() || r.id?.toString() || `reply-${Math.random().toString(36).substr(2, 9)}`,
           author: (r.userid && r.userid.toString() === '0') || r.admin || r.name === 'System' || (r.requestor_type === 'staff' || r.requestor_type === 'api') ? 'Support Staff' : 'Client',
           message: r.message,
           date: r.date,
@@ -375,7 +375,7 @@ const departmentNameToIdMap: Record<string, string> = {
   "Technical Support": "1",
   "Billing": "2",
   "Sales": "3",
-  "General Inquiry": "4", 
+  "General Inquiry": "4",
 };
 
 export const openTicketWHMCS = async (ticketData: { clientid: string, deptname: string; subject: string; message: string; priority: 'Low' | 'Medium' | 'High'; serviceid?: string }): Promise<{ result: 'success' | 'error'; message?: string; ticketId?: string; ticketNumber?: string }> => {
@@ -387,13 +387,13 @@ export const openTicketWHMCS = async (ticketData: { clientid: string, deptname: 
 
     const params = {
       clientid: ticketData.clientid,
-      deptid: deptid, 
+      deptid: deptid,
       subject: ticketData.subject,
       message: ticketData.message,
       priority: ticketData.priority,
       ...(ticketData.serviceid && { serviceid: ticketData.serviceid }),
     };
-    
+
     const data = await callWhmcsApi('OpenTicket', params);
     if (data.result === 'success' && data.id && data.tid) {
       return { result: 'success', ticketId: data.id.toString(), ticketNumber: data.tid };
@@ -407,22 +407,22 @@ export const openTicketWHMCS = async (ticketData: { clientid: string, deptname: 
 export const replyToTicketWHMCS = async (replyData: { ticketid: string, message: string, clientid?: string, adminusername?: string }): Promise<{ result: 'success' | 'error'; message?: string; reply?: TicketReply }> => {
   try {
     const params: Record<string, any> = {
-      ticketid: replyData.ticketid, 
+      ticketid: replyData.ticketid,
       message: replyData.message,
     };
     if (replyData.clientid) {
         params.clientid = replyData.clientid;
     } else if (replyData.adminusername) {
-        params.adminusername = replyData.adminusername; 
+        params.adminusername = replyData.adminusername;
     }
-    
+
     const data = await callWhmcsApi('AddTicketReply', params);
     if (data.result === 'success') {
-      const newReply: TicketReply = { 
-        id: `temp-reply-${Date.now()}-${Math.random().toString(16).slice(2)}`, 
-        author: replyData.clientid ? 'Client' : 'Support Staff', 
+      const newReply: TicketReply = {
+        id: `temp-reply-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        author: replyData.clientid ? 'Client' : 'Support Staff',
         message: replyData.message,
-        date: format(new Date(), 'yyyy-MM-dd HH:mm:ss'), 
+        date: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
       };
       return { result: 'success', reply: newReply };
     }
@@ -439,12 +439,12 @@ export const createSsoTokenWHMCS = async (
     if (!params.clientid && !params.service_id) {
       return { result: 'error', message: 'Client ID or Service ID is required for SSO token creation.' };
     }
-    
+
     const whmcsParams: Record<string, any> = {};
-    if (params.clientid) whmcsParams.client_id = params.clientid; 
+    if (params.clientid) whmcsParams.client_id = params.clientid;
     if (params.service_id) whmcsParams.service_id = params.service_id;
-    if (params.module) whmcsParams.sso_module = params.module; 
-    if (params.destination) whmcsParams.sso_destination = params.destination; 
+    if (params.module) whmcsParams.sso_module = params.module;
+    if (params.destination) whmcsParams.sso_destination = params.destination;
 
 
     const data = await callWhmcsApi('CreateSsoToken', whmcsParams);
@@ -458,29 +458,29 @@ export const createSsoTokenWHMCS = async (
 };
 
 export const addFundsWHMCS = async (
-  userId: string, 
-  amount: number, 
-  paymentMethodGateway: string 
+  userId: string,
+  amount: number,
+  paymentMethodGateway: string
 ): Promise<{ result: 'success' | 'error'; message?: string; invoiceId?: string; paymentUrl?: string }> => {
   try {
     const invoiceParams = {
       clientid: userId,
-      status: 'Unpaid', 
-      sendinvoice: true, 
+      status: 'Unpaid',
+      sendinvoice: true,
       paymentmethod: paymentMethodGateway,
       itemdescription1: `Add Funds - ${new Date().toISOString().split('T')[0]}`,
       itemamount1: amount.toFixed(2),
-      itemtaxed1: 0, 
+      itemtaxed1: 0,
     };
 
     const invoiceData = await callWhmcsApi('AddInvoice', invoiceParams);
 
     if (invoiceData.result === 'success' && invoiceData.invoiceid) {
       const paymentUrl = `${process.env.NEXT_PUBLIC_WHMCS_APP_URL || WHMCS_API_URL?.replace('/includes/api.php', '')}/viewinvoice.php?id=${invoiceData.invoiceid}`;
-      return { 
-        result: 'success', 
+      return {
+        result: 'success',
         invoiceId: invoiceData.invoiceid.toString(),
-        paymentUrl: paymentUrl 
+        paymentUrl: paymentUrl
       };
     } else {
       return { result: 'error', message: invoiceData.message || 'Failed to create invoice for adding funds.' };
@@ -504,14 +504,15 @@ export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[],
           tagline: g.tagline,
           order: parseInt(g.order, 10) || 0,
         })).sort((a, b) => a.order - b.order);
-        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful. Found ${groups.length} groups. Parsed groups:`, groups);
+        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful. Found ${groups.length} groups. Parsed groups:`, JSON.stringify(groups.map(g => ({id: g.id, name: g.name}))));
+        console.log(`[WHMCS API SERVER INFO] Raw data.groups from WHMCS:`, JSON.stringify(data.groups));
       } else if (data.groups) {
-        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful, but data.groups.group is missing or empty. Raw data.groups:`, data.groups, `Full data:`, data);
+        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful, but data.groups.group is missing or empty. Raw data.groups:`, JSON.stringify(data.groups), `Full data:`, JSON.stringify(data));
       } else {
-        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful, but data.groups is missing. Full data:`, data);
+        console.log(`[WHMCS API SERVER INFO] GetProductGroups successful, but data.groups is missing. Full data:`, JSON.stringify(data));
       }
     } else {
-      console.warn(`[WHMCS API SERVER WARN] GetProductGroups API call failed. Full data:`, data);
+      console.warn(`[WHMCS API SERVER WARN] GetProductGroups API call failed. Full data:`, JSON.stringify(data));
     }
     return { groups, whmcsData: data };
   } catch (error) {
@@ -520,40 +521,63 @@ export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[],
   }
 };
 
-const getDisplayPrice = (pricing: ProductPricing, currencyCode: string = 'USD'): string => {
-  const currencyPricing = pricing[currencyCode];
-  if (!currencyPricing) return "Contact Us";
+const getDisplayPrice = (pricing: ProductPricing, currencyCodeFromProduct: string | undefined): string => {
+  const targetCurrencyCode = currencyCodeFromProduct || 'USD';
+  const currencyPricing = pricing[targetCurrencyCode];
 
-  const cycles = ['monthly', 'quarterly', 'annually', 'biennially', 'triennially'];
-  let displayPriceStr = "Contact Us";
-  let foundPrice = false;
-
-  for (const cycle of cycles) {
-    const priceKey = cycle as keyof typeof currencyPricing;
-    if (currencyPricing[priceKey] && typeof currencyPricing[priceKey] === 'string') {
-      const priceValue = parseFloat(currencyPricing[priceKey] as string);
-      if (priceValue >= 0) { // -1.00 often means not available for that cycle
-        let cycleName = cycle.charAt(0).toUpperCase() + cycle.slice(1);
-        if (cycle === 'monthly') cycleName = "/mo";
-        else if (cycle === 'annually') cycleName = "/yr";
-        else if (cycle === 'quarterly') cycleName = "/qtr";
-        else if (cycle === 'semiannually') cycleName = "/s-yr";
-        else if (cycle === 'biennially') cycleName = "/2yrs";
-        else if (cycle === 'triennially') cycleName = "/3yrs";
-        
-        displayPriceStr = `${currencyPricing.prefix}${priceValue.toFixed(2)} ${currencyPricing.suffix} ${cycleName}`;
-        foundPrice = true;
-        break; 
+  if (!currencyPricing) {
+    const availableCurrencyCodes = Object.keys(pricing);
+    if (availableCurrencyCodes.length > 0) {
+      const firstAvailableCurrencyPricing = pricing[availableCurrencyCodes[0]];
+      if (firstAvailableCurrencyPricing) {
+        const cycles = ['monthly', 'quarterly', 'semiannually', 'annually', 'biennially', 'triennially', 'onetime'];
+        for (const cycle of cycles) {
+            const priceKey = cycle as keyof typeof firstAvailableCurrencyPricing;
+            if (Object.prototype.hasOwnProperty.call(firstAvailableCurrencyPricing, priceKey) && typeof firstAvailableCurrencyPricing[priceKey] === 'string') {
+                const priceValue = parseFloat(firstAvailableCurrencyPricing[priceKey] as string);
+                 if (priceValue >= 0) {
+                    let cycleName = cycle.charAt(0).toUpperCase() + cycle.slice(1);
+                    if (cycle === 'monthly') cycleName = "/mo";
+                    else if (cycle === 'annually') cycleName = "/yr";
+                    else if (cycle === 'quarterly') cycleName = "/qtr";
+                    else if (cycle === 'semiannually') cycleName = "/s-yr";
+                    else if (cycle === 'biennially') cycleName = "/2yrs";
+                    else if (cycle === 'triennially') cycleName = "/3yrs";
+                    else if (cycle === 'onetime') cycleName = "One Time";
+                    return `${firstAvailableCurrencyPricing.prefix}${priceValue.toFixed(2)} ${firstAvailableCurrencyPricing.suffix || availableCurrencyCodes[0]} ${cycle === 'onetime' ? '' : cycleName}`.trim();
+                 }
+            }
+        }
       }
     }
+    return "Contact Us";
   }
-  return displayPriceStr;
+
+  const cycles = ['monthly', 'quarterly', 'semiannually', 'annually', 'biennially', 'triennially', 'onetime'];
+  for (const cycle of cycles) {
+    const priceKey = cycle as keyof typeof currencyPricing;
+    if (Object.prototype.hasOwnProperty.call(currencyPricing, priceKey) && typeof currencyPricing[priceKey] === 'string') {
+        const priceValue = parseFloat(currencyPricing[priceKey] as string);
+        if (priceValue >= 0) {
+            let cycleName = cycle.charAt(0).toUpperCase() + cycle.slice(1);
+            if (cycle === 'monthly') cycleName = "/mo";
+            else if (cycle === 'annually') cycleName = "/yr";
+            else if (cycle === 'quarterly') cycleName = "/qtr";
+            else if (cycle === 'semiannually') cycleName = "/s-yr";
+            else if (cycle === 'biennially') cycleName = "/2yrs";
+            else if (cycle === 'triennially') cycleName = "/3yrs";
+            else if (cycle === 'onetime') cycleName = "One Time";
+            return `${currencyPricing.prefix}${priceValue.toFixed(2)} ${currencyPricing.suffix || targetCurrencyCode} ${cycle === 'onetime' ? '' : cycleName}`.trim();
+        }
+    }
+  }
+  return "Contact Us";
 };
 
 
 export const getProductsWHMCS = async (gid?: string): Promise<{ products: Product[], whmcsData?: any }> => {
   try {
-    const params: Record<string, any> = { }; // Removed include_features as GetProducts doesn't use it.
+    const params: Record<string, any> = { }; // GetProducts doesn't use include_features
     if (gid) {
       params.gid = gid;
     }
@@ -564,7 +588,8 @@ export const getProductsWHMCS = async (gid?: string): Promise<{ products: Produc
       const productsArray = Array.isArray(data.products.product) ? data.products.product : [data.products.product];
       products = productsArray.map((p: any) => {
         const pricing = p.pricing as ProductPricing;
-        
+        const currencyCodeFromProduct = p.pricing ? Object.keys(p.pricing)[0] : undefined;
+
         return {
           pid: p.pid.toString(),
           gid: p.gid.toString(),
@@ -572,11 +597,11 @@ export const getProductsWHMCS = async (gid?: string): Promise<{ products: Produc
           name: p.name,
           slug: p.slug,
           "product-url": p['product-url'],
-          description: p.description, 
+          description: p.description,
           module: p.module,
           paytype: p.paytype,
           pricing: pricing,
-          displayPrice: getDisplayPrice(pricing, p.pricing ? Object.keys(p.pricing)[0] : 'USD'), // Attempt to use first available currency or default
+          displayPrice: getDisplayPrice(pricing, currencyCodeFromProduct),
           allowqty: p.allowqty,
           quantity_available: p.quantity_available
         };
@@ -632,7 +657,7 @@ export const replyToTicketAPI = async (userId: string, ticketId: string, message
    const response = await fetch(`/api/data/ticket-replies/${ticketId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ message, userId }), 
+    body: JSON.stringify({ message, userId }),
   });
   if (!response.ok) {
     const err = await response.json();
@@ -646,7 +671,7 @@ export const openTicketAPI = async (userId: string, ticketDetails: {subject: str
   const response = await fetch('/api/data/tickets', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ ...ticketDetails, userId }), 
+    body: JSON.stringify({ ...ticketDetails, userId }),
   });
    if (!response.ok) {
     const err = await response.json();

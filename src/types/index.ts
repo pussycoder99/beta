@@ -115,29 +115,29 @@ export interface ProductPricing {
   };
 }
 
-// This represents a more abstract view of features for display,
-// but GetProducts returns customfields and configoptions directly.
-// For the order page, we will primarily rely on the product's main description.
+// ProductFeature is a conceptual type. The GetProducts API returns
+// `customfields` and `configoptions` which are structured differently
+// and more complex. For general order forms, the main HTML `description`
+// field of a product is often used for detailed features.
 export interface ProductFeature {
-  [featureName: string]: string; 
+  [featureName: string]: string;
 }
 
 
 export interface Product {
   pid: string;
   gid: string;
-  type: string; 
+  type: string;
   name: string;
-  slug?: string; // Added from WHMCS GetProducts API example
-  "product-url"?: string; // Added from WHMCS GetProducts API example
+  slug?: string; // From WHMCS GetProducts API
+  "product-url"?: string; // From WHMCS GetProducts API
   description: string; // HTML content
-  module: string; 
+  module: string;
   paytype: 'free' | 'onetime' | 'recurring';
-  pricing: ProductPricing; 
-  // Custom fields and config options can be complex; for now, focusing on main description
-  // features?: ProductFeature; // Simplified: rely on description
-  displayPrice?: string; 
-  allowqty?: number; // Added from WHMCS GetProducts API example
-  quantity_available?: number; // Added from WHMCS GetProducts API example
-  // customfields and configoptions are available in the raw WHMCS data if needed for deep parsing
+  pricing: ProductPricing;
+  displayPrice?: string;
+  allowqty?: number; // From WHMCS GetProducts API
+  quantity_available?: number; // From WHMCS GetProducts API
+  // `customfields` and `configoptions` are available in raw WHMCS GetProducts response
+  // but are not directly mapped here for simplicity in this type.
 }
