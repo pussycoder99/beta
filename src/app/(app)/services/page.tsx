@@ -4,7 +4,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Service } from '@/types';
-// Removed direct import from whmcs-mock-api
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,15 +30,15 @@ const StatusBadge = ({ status }: { status: Service['status'] }) => {
 };
 
 export default function ServicesPage() {
-  const { user, token } = useAuth(); // Added token
+  const { user, token } = useAuth(); 
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user?.id && token) { // Check for token
+    if (user?.id && token) { 
       setIsLoading(true);
-      fetch('/api/data/services', { // Fetch from the internal API route
+      fetch('/api/data/services', { 
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -59,7 +58,7 @@ export default function ServicesPage() {
           setServices(data.services);
         } else {
           console.warn("Services data not found in API response:", data);
-          setServices([]); // Default to empty array if services key is missing
+          setServices([]); 
           toast({ title: 'Notice', description: 'No services found or data format unexpected.', variant: 'default' });
         }
       })
@@ -72,11 +71,11 @@ export default function ServicesPage() {
         setIsLoading(false);
         console.warn("ServicesPage: User present but token is missing. Data fetching skipped.");
     } else {
-        setIsLoading(false); // Not loading if no user or no token
+        setIsLoading(false); 
     }
-  }, [user?.id, token, toast]); // Added token to dependency array
+  }, [user?.id, token, toast]); 
 
-  const handleAction = (serviceId: string, action: string) => {
+  const handleOtherAction = (serviceId: string, action: string) => {
     // Mock action - In a real app, these would likely be API calls too
     toast({ title: 'Action Triggered', description: `${action} for service ${serviceId} (mocked).`});
   };
@@ -102,7 +101,7 @@ export default function ServicesPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold text-foreground">Your Services</h1>
         <Button asChild>
-          <Link href="/services/order">
+          <Link href="/services/order"> {/* This would be a link to a new order page */}
             <PlusCircle className="mr-2 h-4 w-4" /> Order New Service
           </Link>
         </Button>
@@ -136,25 +135,29 @@ export default function ServicesPage() {
                 {services.map((service) => (
                   <TableRow key={service.id}>
                     <TableCell>
-                      <div className="font-medium">{service.name}</div>
+                      <Link href={`/services/${service.id}`} className="font-medium hover:underline text-primary">
+                        {service.name}
+                      </Link>
                       {service.domain && <div className="text-sm text-muted-foreground">{service.domain}</div>}
                     </TableCell>
                     <TableCell>{service.amount} {service.billingCycle}</TableCell>
                     <TableCell>{service.nextDueDate}</TableCell>
                     <TableCell><StatusBadge status={service.status} /></TableCell>
                     <TableCell className="text-right space-x-1">
-                      <Button variant="ghost" size="icon" title="View Details" onClick={() => handleAction(service.id, 'View Details')}>
-                        <Eye className="h-4 w-4" />
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/services/${service.id}`}>
+                          <Eye className="mr-1 h-4 w-4" /> View Details
+                        </Link>
                       </Button>
                       {service.status === 'Active' && (
                         <>
-                          <Button variant="ghost" size="icon" title="Renew" onClick={() => handleAction(service.id, 'Renew')}>
+                          <Button variant="ghost" size="icon" title="Renew" onClick={() => handleOtherAction(service.id, 'Renew')}>
                             <RefreshCw className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" title="Upgrade" onClick={() => handleAction(service.id, 'Upgrade')}>
+                          <Button variant="ghost" size="icon" title="Upgrade" onClick={() => handleOtherAction(service.id, 'Upgrade')}>
                             <ArrowUpCircle className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" title="Cancel" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90" onClick={() => handleAction(service.id, 'Cancel')}>
+                          <Button variant="ghost" size="icon" title="Cancel" className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90" onClick={() => handleOtherAction(service.id, 'Cancel Request')}>
                             <XCircle className="h-4 w-4" />
                           </Button>
                         </>
@@ -170,3 +173,4 @@ export default function ServicesPage() {
     </div>
   );
 }
+

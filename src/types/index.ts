@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   email: string;
@@ -12,7 +13,7 @@ export interface User {
   phoneNumber?: string;
 }
 
-export type ServiceStatus = 'Active' | 'Suspended' | 'Terminated' | 'Pending' | 'Cancelled';
+export type ServiceStatus = 'Active' | 'Suspended' | 'Terminated' | 'Pending' | 'Cancelled' | 'Fraud';
 
 export interface Service {
   id: string;
@@ -27,9 +28,22 @@ export interface Service {
     ipAddress: string;
   };
   domain?: string;
+  // For usage statistics, directly from WHMCS GetClientsProducts
+  diskusage?: string; // e.g., "100 MB" or "100"
+  disklimit?: string; // e.g., "1000 MB" or "1000" or "0" (Unlimited)
+  bwusage?: string;   // e.g., "5000 MB" or "5000"
+  bwlimit?: string;   // e.g., "100000 MB" or "100000" or "0" (Unlimited)
+  lastupdate?: string; // Timestamp of last usage update
+  username?: string; // Control panel username
+  // Calculated fields for UI
+  diskUsagePercent?: number;
+  bandwidthUsagePercent?: number;
+  diskUsageRaw?: string;
+  bandwidthUsageRaw?: string;
+  controlPanelLink?: string; // For SSO
 }
 
-export type DomainStatus = 'Active' | 'Pending' | 'Expired' | 'Transferred Away';
+export type DomainStatus = 'Active' | 'Pending' | 'Expired' | 'Transferred Away' | 'Grace' | 'Redemption';
 
 export interface Domain {
   id: string;
@@ -41,7 +55,7 @@ export interface Domain {
   nameservers: string[];
 }
 
-export type InvoiceStatus = 'Paid' | 'Unpaid' | 'Cancelled' | 'Overdue';
+export type InvoiceStatus = 'Paid' | 'Unpaid' | 'Cancelled' | 'Overdue' | 'Refunded' | 'Collections';
 
 export interface Invoice {
   id: string;
@@ -53,7 +67,7 @@ export interface Invoice {
   items: Array<{ description: string; amount: string }>;
 }
 
-export type TicketStatus = 'Open' | 'Answered' | 'Customer-Reply' | 'Closed' | 'In Progress';
+export type TicketStatus = 'Open' | 'Answered' | 'Customer-Reply' | 'Closed' | 'In Progress' | 'On Hold';
 
 export interface TicketReply {
   id: string;
@@ -73,3 +87,4 @@ export interface Ticket {
   priority: 'Low' | 'Medium' | 'High';
   replies?: TicketReply[];
 }
+
