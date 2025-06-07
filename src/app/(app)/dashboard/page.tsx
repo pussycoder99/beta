@@ -195,7 +195,7 @@ export default function DashboardPage() {
                       <p className="text-sm text-muted-foreground">Due: {service.nextDueDate} - {service.amount}</p>
                     </div>
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/services`}>Renew</Link> {/* Simplified link to services page */}
+                      <Link href={`/services`}>Renew</Link>
                     </Button>
                   </li>
                 ))}
@@ -235,17 +235,21 @@ export default function DashboardPage() {
              <h3 className="text-md font-semibold mb-2 mt-4">Active Support Tickets</h3>
             {recentTickets.length > 0 ? (
               <ul className="space-y-3">
-                {recentTickets.map(ticket => (
-                  <li key={ticket.id} className="flex justify-between items-center p-3 bg-card-foreground/5 rounded-md">
-                    <div>
-                      <p className="font-medium">{ticket.subject}</p>
-                      <p className="text-sm text-muted-foreground">Status: {ticket.status} - Last Update: {ticket.lastUpdated}</p>
-                    </div>
-                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/support/${ticket.id}`}>View</Link>
-                    </Button>
-                  </li>
-                ))}
+                {recentTickets.map(ticket => {
+                  // Ensure ticket.id is a string for the href, provide a fallback if necessary
+                  const ticketHref = ticket && typeof ticket.id === 'string' && ticket.id.trim() !== '' ? `/support/${ticket.id}` : '/support';
+                  return (
+                    <li key={ticket.id} className="flex justify-between items-center p-3 bg-card-foreground/5 rounded-md">
+                      <div>
+                        <p className="font-medium">{ticket.subject}</p>
+                        <p className="text-sm text-muted-foreground">Status: {ticket.status} - Last Update: {ticket.lastUpdated}</p>
+                      </div>
+                       <Button variant="outline" size="sm" asChild>
+                        <Link href={ticketHref}>View</Link>
+                      </Button>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="text-muted-foreground">No active support tickets.</p>
