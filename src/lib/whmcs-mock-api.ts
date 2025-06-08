@@ -1,5 +1,5 @@
 
-import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing } from '@/types';
+import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail } from '@/types';
 import { format } from 'date-fns';
 
 const WHMCS_API_URL = process.env.NEXT_PUBLIC_WHMCS_API_URL;
@@ -490,9 +490,9 @@ export const addFundsWHMCS = async (
   }
 };
 
-// This function is for the original approach (using GetProductGroups WHMCS API)
-// It will be called by the /api/data/product-groups route IF that API is available in WHMCS
-export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[], whmcsData?: any }> => {
+
+export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[], whmcsData?: any, source?: string, allProducts?: Product[] }> => {
+  console.log('[WHMCS API SERVER INFO - getProductGroupsWHMCS] Attempting GetProductGroups.');
   try {
     const data = await callWhmcsApi('GetProductGroups', {});
     let groups: ProductGroup[] = [];
@@ -507,91 +507,93 @@ export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[],
           order: parseInt(g.order, 10) || 0,
         })).sort((a, b) => (a.order || 0) - (b.order || 0));
         console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful. Found ${groups.length} groups. Parsed groups:`, JSON.stringify(groups.map(g => ({id: g.id, name: g.name}))));
-        console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] Raw data.groups from WHMCS:`, JSON.stringify(data.groups));
-      } else if (data.groups) {
-        console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful, but data.groups.group is missing or empty. Raw data.groups:`, JSON.stringify(data.groups), `Full data:`, JSON.stringify(data));
+        return { groups, whmcsData: data, source: 'GetProductGroups' };
       } else {
-        console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful, but data.groups is missing. Full data:`, JSON.stringify(data));
+         console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful, but data.groups or data.groups.group is missing/empty. Raw data:`, JSON.stringify(data));
+         return { groups: [], whmcsData: data, source: 'GetProductGroups_NoGroupData' };
       }
     } else {
       console.warn(`[WHMCS API SERVER WARN - getProductGroupsWHMCS] GetProductGroups API call failed. Full data:`, JSON.stringify(data));
-      // If GetProductGroups fails, we still return empty groups, and the new API route will try the alternative.
+      return { groups: [], whmcsData: data, source: 'GetProductGroups_Failed' };
     }
-    return { groups, whmcsData: data };
   } catch (error) {
     console.error("[WHMCS API SERVER CATCH ERROR - getProductGroupsWHMCS] Failed to fetch product groups:", error);
-    // If GetProductGroups fails, we still return empty groups, and the new API route will try the alternative.
-    return { groups: [] };
+    return { groups: [], source: 'GetProductGroups_Exception' };
   }
 };
 
-const getDisplayPrice = (pricing: ProductPricing, currencyCodeFromProduct: string | undefined): string => {
-  const targetCurrencyCode = currencyCodeFromProduct || 'USD'; // Default to USD if not available
-  const currencyPricing = pricing[targetCurrencyCode];
 
-  if (!currencyPricing) {
-    const availableCurrencyCodes = Object.keys(pricing);
-    if (availableCurrencyCodes.length > 0) {
-      const firstAvailableCurrencyPricing = pricing[availableCurrencyCodes[0]];
-      if (firstAvailableCurrencyPricing) {
-        const cycles = ['monthly', 'quarterly', 'semiannually', 'annually', 'biennially', 'triennially', 'onetime'];
-        for (const cycle of cycles) {
-            const priceKey = cycle as keyof typeof firstAvailableCurrencyPricing;
-            if (Object.prototype.hasOwnProperty.call(firstAvailableCurrencyPricing, priceKey) && typeof firstAvailableCurrencyPricing[priceKey] === 'string') {
-                const priceValue = parseFloat(firstAvailableCurrencyPricing[priceKey] as string);
-                 if (priceValue >= 0) { // Price is valid (not -1.00 which means not available)
-                    let cycleName = cycle.charAt(0).toUpperCase() + cycle.slice(1);
-                    if (cycle === 'monthly') cycleName = "/mo";
-                    else if (cycle === 'annually') cycleName = "/yr";
-                    else if (cycle === 'quarterly') cycleName = "/qtr";
-                    else if (cycle === 'semiannually') cycleName = "/s-yr";
-                    else if (cycle === 'biennially') cycleName = "/2yrs";
-                    else if (cycle === 'triennially') cycleName = "/3yrs";
-                    else if (cycle === 'onetime') cycleName = "One Time";
-                    return `${firstAvailableCurrencyPricing.prefix}${priceValue.toFixed(2)} ${firstAvailableCurrencyPricing.suffix || availableCurrencyCodes[0]} ${cycle === 'onetime' ? '' : cycleName}`.trim();
-                 }
+const WHMCS_BILLING_CYCLES_MAP: Record<string, string> = {
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  semiannually: "Semi-Annually",
+  annually: "Annually",
+  biennially: "Biennially",
+  triennially: "Triennially",
+  onetime: "One Time",
+};
+
+const WHMCS_SETUP_FEE_MAP: Record<string, string> = {
+  monthly: "msetupfee",
+  quarterly: "qsetupfee",
+  semiannually: "ssetupfee",
+  annually: "asetupfee",
+  biennially: "bsetupfee",
+  triennially: "tsetupfee",
+  onetime: "msetupfee", // Onetime often uses msetupfee or has no specific setup fee for the cycle itself
+};
+
+
+export const parsePricingCycles = (pricing: ProductPricing, currencyCodeFromProduct?: string): PricingCycleDetail[] => {
+  const parsedCycles: PricingCycleDetail[] = [];
+  const targetCurrencyCode = currencyCodeFromProduct || Object.keys(pricing)[0] || 'USD';
+  const currencyData = pricing[targetCurrencyCode];
+
+  if (!currencyData) {
+    console.warn(`[parsePricingCycles] No pricing data found for currency code: ${targetCurrencyCode}`);
+    return [];
+  }
+
+  for (const whmcsCycle of Object.keys(WHMCS_BILLING_CYCLES_MAP)) {
+    const cyclePriceStr = currencyData[whmcsCycle as keyof typeof currencyData];
+    if (typeof cyclePriceStr === 'string') {
+      const cyclePrice = parseFloat(cyclePriceStr);
+      if (cyclePrice >= 0) { // WHMCS uses -1.00 for unavailable cycles
+        const cycleName = WHMCS_BILLING_CYCLES_MAP[whmcsCycle];
+        let displayPrice = `${currencyData.prefix}${cyclePrice.toFixed(2)} ${currencyData.suffix || targetCurrencyCode}`;
+        if (whmcsCycle !== 'onetime') {
+          displayPrice += ` ${cycleName}`;
+        }
+
+        let setupFeeDisplay: string | undefined = undefined;
+        const setupFeeKey = WHMCS_SETUP_FEE_MAP[whmcsCycle] as keyof typeof currencyData;
+        const setupFeeStr = currencyData[setupFeeKey];
+        if (typeof setupFeeStr === 'string') {
+            const setupFee = parseFloat(setupFeeStr);
+            if (setupFee > 0) {
+                setupFeeDisplay = `${currencyData.prefix}${setupFee.toFixed(2)} Setup`;
             }
         }
+        
+        parsedCycles.push({
+          whmcsCycle: whmcsCycle,
+          cycleName: cycleName,
+          displayPrice: displayPrice.trim(),
+          ...(setupFeeDisplay && { setupFee: setupFeeDisplay }),
+        });
       }
     }
-    return "Contact Us"; // Fallback if no pricing found
   }
-
-  // Standard cycles check
-  const cycles = ['monthly', 'quarterly', 'semiannually', 'annually', 'biennially', 'triennially', 'onetime'];
-  for (const cycle of cycles) {
-    const priceKey = cycle as keyof typeof currencyPricing;
-    // Check if the cycle exists and is a valid price (not -1.00 which means not available for that cycle)
-    if (Object.prototype.hasOwnProperty.call(currencyPricing, priceKey) && typeof currencyPricing[priceKey] === 'string') {
-        const priceValue = parseFloat(currencyPricing[priceKey] as string);
-        if (priceValue >= 0) { // Price is valid
-            let cycleName = cycle.charAt(0).toUpperCase() + cycle.slice(1);
-            if (cycle === 'monthly') cycleName = "/mo";
-            else if (cycle === 'annually') cycleName = "/yr";
-            else if (cycle === 'quarterly') cycleName = "/qtr";
-            else if (cycle === 'semiannually') cycleName = "/s-yr";
-            else if (cycle === 'biennially') cycleName = "/2yrs";
-            else if (cycle === 'triennially') cycleName = "/3yrs";
-            else if (cycle === 'onetime') cycleName = "One Time";
-            return `${currencyPricing.prefix}${priceValue.toFixed(2)} ${currencyPricing.suffix || targetCurrencyCode} ${cycle === 'onetime' ? '' : cycleName}`.trim();
-        }
-    }
-  }
-  return "Contact Us"; // Fallback if no valid pricing found for any cycle
+  return parsedCycles;
 };
 
-// Fetches products, optionally filtered by GID.
-// When GID is not provided, it fetches ALL products.
-// It's expected that WHMCS GetProducts API includes 'groupname' for each product when fetching all.
+
 export const getProductsWHMCS = async (gid?: string): Promise<{ products: Product[], whmcsData?: any }> => {
   try {
     const params: Record<string, any> = { };
     if (gid) {
       params.gid = gid;
     } else {
-      // Fetching all products, so no gid.
-      // WHMCS documentation suggests that when fetching all products, 'groupname' is included.
-      // We rely on this for the "derive groups" strategy.
       console.log("[WHMCS API SERVER INFO - getProductsWHMCS] Fetching ALL products (no GID specified). Expecting 'groupname' in response for each product.");
     }
     const data = await callWhmcsApi('GetProducts', params);
@@ -601,32 +603,33 @@ export const getProductsWHMCS = async (gid?: string): Promise<{ products: Produc
       const productsArray = Array.isArray(data.products.product) ? data.products.product : [data.products.product];
       products = productsArray.map((p: any) => {
         const pricing = p.pricing as ProductPricing;
-        // The currency code might be part of the product itself or needs to be inferred
         const currencyCodeFromProduct = p.pricing ? Object.keys(p.pricing)[0] : undefined;
 
         if (!gid && !p.groupname) {
             console.warn(`[WHMCS API SERVER WARN - getProductsWHMCS] Product PID ${p.pid} is missing 'groupname' when fetching all products. Group derivation might be incomplete.`);
         }
+        
+        const parsedPricingCycles = parsePricingCycles(pricing, currencyCodeFromProduct);
 
         return {
           pid: p.pid.toString(),
           gid: p.gid.toString(),
-          groupname: p.groupname, // Crucial for deriving groups if GetProductGroups is unavailable
+          groupname: p.groupname, 
           type: p.type,
           name: p.name,
           slug: p.slug,
           "product-url": p['product-url'],
-          description: p.description, // HTML content
+          description: p.description,
           module: p.module,
           paytype: p.paytype as 'free' | 'onetime' | 'recurring',
           pricing: pricing,
-          displayPrice: getDisplayPrice(pricing, currencyCodeFromProduct),
+          parsedPricingCycles: parsedPricingCycles,
           allowqty: p.allowqty,
           quantity_available: p.quantity_available
         };
       });
       if (!gid) {
-        console.log(`[WHMCS API SERVER INFO - getProductsWHMCS] Successfully fetched ${products.length} products (all). First few products raw:`, JSON.stringify(productsArray.slice(0,2)));
+        console.log(`[WHMCS API SERVER INFO - getProductsWHMCS] Successfully fetched ${products.length} products (all). First few products raw:`, JSON.stringify(productsArray.slice(0,1)));
       }
     } else if (data.result !== 'success') {
       console.warn(`[WHMCS API SERVER WARN - getProductsWHMCS] GetProducts API call ${gid ? `for GID ${gid}` : '(all products)'} failed. Data:`, data);
@@ -702,3 +705,4 @@ export const openTicketAPI = async (userId: string, ticketDetails: {subject: str
   }
   return response.json();
 };
+

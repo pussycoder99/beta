@@ -91,9 +91,9 @@ export interface Ticket {
 export interface ProductGroup {
   id: string; // This will be the 'gid'
   name: string; // This will be the 'groupname'
-  headline?: string; // May not be available when deriving from products
-  tagline?: string; // May not be available when deriving from products
-  order?: number; // May not be available when deriving from products
+  headline?: string; 
+  tagline?: string; 
+  order?: number; 
 }
 
 export interface ProductPricing {
@@ -115,6 +115,13 @@ export interface ProductPricing {
   };
 }
 
+export interface PricingCycleDetail {
+  cycleName: string; // e.g., "Monthly", "Annually"
+  displayPrice: string; // e.g., "$10.00 USD /mo"
+  whmcsCycle: string; // e.g., "monthly", "annually" - for cart link
+  setupFee?: string; // e.g., "$5.00 Setup"
+}
+
 export interface Product {
   pid: string;
   gid: string;
@@ -127,7 +134,8 @@ export interface Product {
   module: string;
   paytype: 'free' | 'onetime' | 'recurring';
   pricing: ProductPricing;
-  displayPrice?: string;
+  parsedPricingCycles: PricingCycleDetail[]; // For the pricing dropdown
   allowqty?: number;
   quantity_available?: number;
 }
+
