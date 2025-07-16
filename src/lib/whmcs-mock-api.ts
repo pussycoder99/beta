@@ -2,6 +2,7 @@
 
 
 
+
 import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail, DomainSearchResult, DomainConfiguration, PaymentMethod } from '@/types';
 import { format } from 'date-fns';
 
@@ -11,7 +12,7 @@ const WHMCS_API_SECRET = process.env.WHMCS_API_SECRET;
 
 export async function callWhmcsApi(action: string, params: Record<string, any> = {}): Promise<any> {
   if (!WHMCS_API_URL || !WHMCS_API_IDENTIFIER || !WHMCS_API_SECRET) {
-    const errorMessage = "WHMCS API credentials or URL are not configured server-side. Ensure WHMCS_API_IDENTIFIER, WHMCS_API_SECRET, and NEXT_PUBLIC_WHMCS_API_URL are set in your .env.local file.";
+    const errorMessage = "WHMCS API credentials not configured on the server. If this is a deployed environment (like Netlify), ensure WHMCS_API_IDENTIFIER, WHMCS_API_SECRET, and NEXT_PUBLIC_WHMCS_API_URL are set in the site's environment variables settings.";
     console.error(`[WHMCS API SERVER ERROR] ${errorMessage}`);
     return { result: 'error', message: errorMessage };
   }
