@@ -1,6 +1,7 @@
 
 
-import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail, DomainSearchResult } from '@/types';
+
+import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail, DomainSearchResult, DomainConfiguration } from '@/types';
 import { format } from 'date-fns';
 
 const WHMCS_API_URL = process.env.NEXT_PUBLIC_WHMCS_API_URL;
@@ -643,5 +644,44 @@ export const domainWhoisWHMCS = async (domain: string): Promise<{ result: Domain
         errorMessage: errorMessage
       }
     };
+  }
+};
+
+export const addDomainOrderWHMCS = async (
+  userId: string,
+  config: DomainConfiguration,
+  paymentMethod: string
+): Promise<{ result: 'success' | 'error'; message?: string; orderid?: string; invoiceid?: string }> => {
+  try {
+    const params: Record<string, any> = {
+      clientid: userId,
+      paymentmethod: paymentMethod,
+      domain: config.domainName,
+      regperiod: config.registrationPeriod,
+      domaintype: 'register',
+      dnsmanagement: config.dnsManagement ? 1 : 0,
+      emailforwarding: config.emailForwarding ? 1 : 0,
+      idprotection: config.idProtection ? 1 : 0,
+    };
+
+    // Add nameservers if they are provided
+    if (config.nameservers.ns1) params.nameserver1 = config.nameservers.ns1;
+    if (config.nameservers.ns2) params.nameserver2 = config.nameservers.ns2;
+    if (config.nameservers.ns3) params.nameserver3 = config.nameservers.ns3;
+    if (config.nameservers.ns4) params.nameserver4 = config.nameservers.ns4;
+
+    const data = await callWhmcsApi('AddOrder', params);
+
+    if (data.result === 'success' && data.orderid && data.invoiceid) {
+      return {
+        result: 'success',
+        orderid: data.orderid.toString(),
+        invoiceid: data.invoiceid.toString(),
+      };
+    } else {
+      return { result: 'error', message: data.message || 'Failed to create domain order in WHMCS.' };
+    }
+  } catch (error: any) {
+    return { result: 'error', message: (error instanceof Error ? error.message : String(error)) };
   }
 };

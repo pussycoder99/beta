@@ -1,20 +1,99 @@
 
 "use client";
 
-import React, { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React, { Suspense, useState, FormEvent, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, ShoppingCart, ShieldCheck, Database, Forward } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, ShieldCheck, Database, Forward, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/use-auth';
+import { useToast } from '@/hooks/use-toast';
+import type { DomainConfiguration } from '@/types';
+
+// Mock pricing, in a real scenario this would come from the API
+const PRICING = {
+    register: 10.99,
+    idProtection: 2.50,
+};
 
 function ConfigureDomainContent() {
+    const { user, token } = useAuth();
+    const { toast } = useToast();
+    const router = useRouter();
     const searchParams = useSearchParams();
     const domainName = searchParams.get('domain');
+
+    const [config, setConfig] = useState<DomainConfiguration>({
+        domainName: domainName || '',
+        registrationPeriod: 1,
+        idProtection: true,
+        dnsManagement: true,
+        emailForwarding: true,
+        nameservers: { ns1: '', ns2: '' },
+    });
+    
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [total, setTotal] = useState(0);
+
+    useEffect(() => {
+        if (domainName) {
+            setConfig(prev => ({ ...prev, domainName }));
+        }
+    }, [domainName]);
+
+    useEffect(() => {
+        let currentTotal = PRICING.register * config.registrationPeriod;
+        if (config.idProtection) {
+            currentTotal += PRICING.idProtection;
+        }
+        setTotal(currentTotal);
+    }, [config.registrationPeriod, config.idProtection]);
+
+    const handleCheckboxChange = (id: 'idProtection' | 'dnsManagement' | 'emailForwarding', checked: boolean | 'indeterminate') => {
+        if (typeof checked === 'boolean') {
+            setConfig(prev => ({ ...prev, [id]: checked }));
+        }
+    };
+
+    const handleNsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setConfig(prev => ({ ...prev, nameservers: { ...prev.nameservers, [id]: value } }));
+    };
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        if (!user || !token) {
+            toast({ title: 'Not Authenticated', description: 'You must be logged in to place an order.', variant: 'destructive' });
+            return;
+        }
+        setIsProcessing(true);
+        try {
+            const response = await fetch('/api/domains/order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(config),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to create domain order.');
+            }
+            toast({
+                title: 'Order Created!',
+                description: `Invoice #${data.invoiceid} has been generated. Redirecting to payment...`,
+            });
+            // Redirect to WHMCS invoice page
+            window.location.href = data.invoiceUrl;
+        } catch (error) {
+            toast({ title: 'Order Failed', description: (error as Error).message, variant: 'destructive' });
+            setIsProcessing(false);
+        }
+    };
+
 
     if (!domainName) {
         return (
@@ -46,7 +125,7 @@ function ConfigureDomainContent() {
                 </div>
             </div>
 
-            <form>
+            <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Main Configuration */}
                     <div className="lg:col-span-2 space-y-6">
@@ -55,14 +134,17 @@ function ConfigureDomainContent() {
                                 <CardTitle>Registration Period</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <Select defaultValue="1">
+                                <Select 
+                                    value={config.registrationPeriod.toString()} 
+                                    onValueChange={(val) => setConfig(prev => ({...prev, registrationPeriod: parseInt(val)}))}
+                                >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select registration period" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="1">1 Year</SelectItem>
-                                        <SelectItem value="2">2 Years</SelectItem>
-                                        <SelectItem value="3">3 Years</SelectItem>
+                                        <SelectItem value="1">1 Year - ${PRICING.register.toFixed(2)}</SelectItem>
+                                        <SelectItem value="2">2 Years - ${(PRICING.register * 2).toFixed(2)}</SelectItem>
+                                        <SelectItem value="3">3 Years - ${(PRICING.register * 3).toFixed(2)}</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </CardContent>
@@ -71,24 +153,24 @@ function ConfigureDomainContent() {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Nameservers</CardTitle>
-                                <CardDescription>By default, new domains will use our nameservers for hosting on our network. If you want to use custom nameservers, enter them below.</CardDescription>
+                                <CardDescription>By default, new domains will use our nameservers. If you want to use custom nameservers, enter them below.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div>
                                     <Label htmlFor="ns1">Nameserver 1</Label>
-                                    <Input id="ns1" placeholder="ns1.snbdhost.com" />
+                                    <Input id="ns1" value={config.nameservers.ns1} onChange={handleNsChange} placeholder="ns1.snbdhost.com" />
                                 </div>
                                 <div>
                                     <Label htmlFor="ns2">Nameserver 2</Label>
-                                    <Input id="ns2" placeholder="ns2.snbdhost.com" />
+                                    <Input id="ns2" value={config.nameservers.ns2} onChange={handleNsChange} placeholder="ns2.snbdhost.com" />
                                 </div>
                                 <div>
                                     <Label htmlFor="ns3">Nameserver 3 (Optional)</Label>
-                                    <Input id="ns3" />
+                                    <Input id="ns3" value={config.nameservers.ns3 || ''} onChange={handleNsChange} />
                                 </div>
                                 <div>
                                     <Label htmlFor="ns4">Nameserver 4 (Optional)</Label>
-                                    <Input id="ns4" />
+                                    <Input id="ns4" value={config.nameservers.ns4 || ''} onChange={handleNsChange} />
                                 </div>
                             </CardContent>
                         </Card>
@@ -102,30 +184,30 @@ function ConfigureDomainContent() {
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="flex items-start space-x-3 p-4 border rounded-md">
-                                    <Checkbox id="dnsManagement" />
+                                    <Checkbox id="dnsManagement" checked={config.dnsManagement} onCheckedChange={(c) => handleCheckboxChange('dnsManagement', c)} />
                                     <div className="grid gap-1.5 leading-none">
                                         <label htmlFor="dnsManagement" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2">
                                             <Database className="h-4 w-4 text-primary"/> DNS Management
                                         </label>
-                                        <p className="text-sm text-muted-foreground">Free - Host your own DNS with us.</p>
+                                        <p className="text-sm text-muted-foreground">Free</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start space-x-3 p-4 border rounded-md">
-                                    <Checkbox id="idProtection" />
+                                    <Checkbox id="idProtection" checked={config.idProtection} onCheckedChange={(c) => handleCheckboxChange('idProtection', c)} />
                                     <div className="grid gap-1.5 leading-none">
                                         <label htmlFor="idProtection" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2">
                                             <ShieldCheck className="h-4 w-4 text-primary"/> ID Protection
                                         </label>
-                                        <p className="text-sm text-muted-foreground">Protect your personal information.</p>
+                                        <p className="text-sm text-muted-foreground">${PRICING.idProtection.toFixed(2)}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start space-x-3 p-4 border rounded-md">
-                                    <Checkbox id="emailForwarding" />
+                                    <Checkbox id="emailForwarding" checked={config.emailForwarding} onCheckedChange={(c) => handleCheckboxChange('emailForwarding', c)} />
                                     <div className="grid gap-1.5 leading-none">
                                         <label htmlFor="emailForwarding" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2">
                                             <Forward className="h-4 w-4 text-primary"/> Email Forwarding
                                         </label>
-                                        <p className="text-sm text-muted-foreground">Free - Forward emails to another address.</p>
+                                        <p className="text-sm text-muted-foreground">Free</p>
                                     </div>
                                 </div>
                             </CardContent>
@@ -137,25 +219,24 @@ function ConfigureDomainContent() {
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm">
                                 <div className="flex justify-between">
-                                    <span>Domain Registration (1 Year)</span>
-                                    <span className="font-medium">$10.99</span>
+                                    <span>Domain Registration ({config.registrationPeriod} Year/s)</span>
+                                    <span className="font-medium">${(PRICING.register * config.registrationPeriod).toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span>ID Protection</span>
-                                    <span className="font-medium">$2.50</span>
-                                </div>
-                                <div className="flex justify-between text-muted-foreground">
-                                    <span>Subtotal</span>
-                                    <span>$13.49</span>
-                                </div>
+                                {config.idProtection && (
+                                    <div className="flex justify-between">
+                                        <span>ID Protection</span>
+                                        <span className="font-medium">${PRICING.idProtection.toFixed(2)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between font-bold text-lg pt-2 border-t mt-2">
                                     <span>Total Due Today</span>
-                                    <span>$13.49</span>
+                                    <span>${total.toFixed(2)}</span>
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                <Button className="w-full">
-                                    <ShoppingCart className="mr-2 h-4 w-4" /> Continue to Checkout
+                                <Button type="submit" className="w-full" disabled={isProcessing}>
+                                    {isProcessing ? <Loader2 className="animate-spin" /> : <ShoppingCart className="mr-2 h-4 w-4" />}
+                                    Continue to Checkout
                                 </Button>
                             </CardFooter>
                         </Card>
@@ -173,5 +254,3 @@ export default function ConfigureDomainPage() {
         </Suspense>
     );
 }
-
-    
