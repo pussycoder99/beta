@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -26,21 +27,9 @@ export function LoginForm() {
       await login(email, password);
       toast({ title: 'Success', description: 'Logged in successfully!' });
     } catch (error) {
-      let finalMessage = 'An unknown error occurred during login.';
-      if (error instanceof Error) {
-        finalMessage = error.message;
-        try {
-          // Attempt to parse if error.message is a stringified JSON object containing another message
-          const parsedJson = JSON.parse(finalMessage);
-          if (parsedJson && parsedJson.message) {
-            finalMessage = parsedJson.message;
-          }
-        } catch (e) {
-          // Parsing failed, means finalMessage is likely already a simple string or not the specific JSON format we're looking for.
-          // So, we keep the existing finalMessage.
-        }
-      }
-      toast({ title: 'Login Failed', description: finalMessage, variant: 'destructive' });
+      // The error from useAuth().login should be a clean message now.
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      toast({ title: 'Login Failed', description: errorMessage, variant: 'destructive' });
     }
   };
 

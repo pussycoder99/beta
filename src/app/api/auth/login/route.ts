@@ -13,38 +13,28 @@ export async function POST(request: Request) {
     const loginResponse = await validateLoginWHMCS(email, password);
 
     if (loginResponse.result === 'success' && loginResponse.userid) {
-      // Successfully validated with WHMCS, now fetch user details
-      const userDetailsResponse = await getUserDetailsWHMCS(loginResponse.userid); // Use userid from loginResponse
+      const userDetailsResponse = await getUserDetailsWHMCS(loginResponse.userid);
       if (userDetailsResponse.user) {
-        // In a real app, you'd generate a proper session token (e.g., JWT) here
-        // Or use the passwordhash from loginResponse if needed for WHMCS session integration
+        // This is a placeholder token for demonstration purposes.
+        // In a real production app, you would generate a secure JWT here.
         const placeholderToken = `whmcs-session-for-${loginResponse.userid}`;
+        
         return NextResponse.json({ 
           user: userDetailsResponse.user, 
-          token: placeholderToken, // This is our app's session token, not directly from WHMCS API login
+          token: placeholderToken,
           message: 'Login successful' 
         });
       } else {
-        return NextResponse.json({ message: 'User details not found after login.' }, { status: 500 });
+        // This case is unlikely if login succeeded, but good to handle.
+        return NextResponse.json({ message: 'User details not found after successful validation.' }, { status: 500 });
       }
     } else {
-      // If loginResponse contains a message, use it, otherwise provide a generic one
-      return NextResponse.json({ message: loginResponse.message || 'Invalid credentials or unknown API error' }, { status: 401 });
+      // If login failed, return the message from WHMCS or a generic one.
+      return NextResponse.json({ message: loginResponse.message || 'Invalid credentials or API error.' }, { status: 401 });
     }
   } catch (error) {
-    console.error('[API LOGIN ERROR]', error);
-    let errorMessage = 'An unexpected error occurred during login.';
-    if (error instanceof Error) {
-        errorMessage = error.message;
-    }
-    try {
-      const parsedError = JSON.parse(errorMessage);
-      if (parsedError && parsedError.message) {
-        errorMessage = parsedError.message;
-      }
-    } catch (e) {
-      // not a JSON string
-    }
-    return NextResponse.json({ message: `Login failed: ${errorMessage}` }, { status: 500 });
+    console.error('[API LOGIN ROUTE ERROR]', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected server error occurred.';
+    return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }

@@ -1,5 +1,4 @@
 
-
 import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail } from '@/types';
 import { format } from 'date-fns';
 
@@ -11,7 +10,6 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
   if (!WHMCS_API_URL || !WHMCS_API_IDENTIFIER || !WHMCS_API_SECRET) {
     const errorMessage = "WHMCS API credentials or URL are not configured server-side. Ensure WHMCS_API_IDENTIFIER, WHMCS_API_SECRET, and NEXT_PUBLIC_WHMCS_API_URL are set in your .env.local file.";
     console.error(`[WHMCS API SERVER ERROR] ${errorMessage}`);
-    // Return a result: error object instead of throwing, so the UI can handle it gracefully.
     return { result: 'error', message: errorMessage };
   }
 
@@ -25,8 +23,6 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
     formData.append(key, params[key]);
   }
 
-  // console.log(`[WHMCS API SERVER DEBUG] Calling action (via callWhmcsApi): ${action} with params:`, JSON.stringify(params));
-
   try {
     const response = await fetch(WHMCS_API_URL, {
       method: 'POST',
@@ -35,37 +31,28 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
     });
 
     const rawResponseText = await response.text();
-    // console.log(`[WHMCS API SERVER DEBUG] Raw Response Text for ${action}:`, rawResponseText);
 
     if (!response.ok) {
-      const errorText = rawResponseText || `WHMCS API request failed with status ${response.status}`;
-      console.error(`[WHMCS API SERVER ERROR] WHMCS API request failed for action ${action} with status ${response.status}: ${errorText}`);
-      try {
-        const errorJson = JSON.parse(errorText);
-        if (errorJson && errorJson.message) {
-          throw new Error(errorJson.message);
+        console.error(`[WHMCS API SERVER ERROR] Request failed for action ${action} with status ${response.status}. Response: ${rawResponseText}`);
+        throw new Error(`WHMCS API request failed with status ${response.status}.`);
+    }
+
+    try {
+        const data = JSON.parse(rawResponseText);
+        if (data.result === 'error' && action !== 'ValidateLogin') {
+          console.error(`[WHMCS API SERVER ERROR] WHMCS API returned error for action ${action}:`, data.message);
+          return data; // Return the full error object from WHMCS
         }
-      } catch (parseErr) {
-        // Not a JSON error, throw the original text
-      }
-      throw new Error(errorText);
+        return data;
+    } catch(jsonError) {
+        console.error(`[WHMCS API SERVER ERROR] Failed to parse JSON response for action ${action}. Raw response: ${rawResponseText}`, jsonError);
+        throw new Error('Received an invalid response from the WHMCS API.');
     }
 
-    const data = JSON.parse(rawResponseText);
-    // console.log(`[WHMCS API SERVER DEBUG] Parsed Response Data for ${action}:`, data);
-
-    if (data.result === 'error' && action !== 'ValidateLogin') {
-      console.error(`[WHMCS API SERVER ERROR] WHMCS API Error for action ${action}:`, data.message);
-      // For ValidateLogin, we let the specific function handle the error message.
-      return { result: 'error', message: data.message || `WHMCS API error for action ${action}.` };
-    }
-    return data;
   } catch (error: any) {
-    console.error(`[WHMCS API SERVER CATCH ERROR] Error calling WHMCS action ${action}:`, error.message, error.stack);
-    if (error instanceof Error) {
-        throw error;
-    }
-    throw new Error(`An unknown error occurred while calling WHMCS action ${action}.`);
+    console.error(`[WHMCS API SERVER CATCH ERROR] Unhandled exception calling WHMCS action ${action}:`, error.message, error.stack);
+    // Re-throw a generic error to be caught by the calling API route
+    throw new Error(error.message || `An unknown error occurred while calling WHMCS action ${action}.`);
   }
 }
 
@@ -76,8 +63,6 @@ export const validateLoginWHMCS = async (email: string, passwordAttempt: string)
       password2: passwordAttempt,
     });
 
-    // The 'ValidateLogin' action returns result:error for failed logins, which is expected behavior.
-    // We check for success specifically.
     if (data.result === 'success' && data.userid) {
       return {
         result: 'success',
@@ -86,10 +71,10 @@ export const validateLoginWHMCS = async (email: string, passwordAttempt: string)
         twoFactorEnabled: data.twoFactorEnabled === "true" || data.twoFactorEnabled === true
       };
     }
-    // If not success, return the error message from the API.
     return { result: 'error', message: data.message || 'Authentication failed: Unknown reason from WHMCS.' };
   } catch (error: any) {
-    console.error("[WHMCS API SERVER CATCH ERROR] ValidateLogin API error:", error.message);
+    console.error("[WHMCS API CATCH ERROR] validateLoginWHMCS function failed:", error.message);
+    // Propagate the caught error message
     return { result: 'error', message: (error instanceof Error ? error.message : String(error)) };
   }
 };
