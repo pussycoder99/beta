@@ -149,3 +149,19 @@ export interface DomainSearchResult {
   };
   errorMessage?: string;
 }
+
+export interface DomainConfiguration {
+    domainName: string;
+    registrationPeriod: number; // in years, e.g., 1, 2
+    idProtection: boolean;
+    dnsManagement: boolean;
+    emailForwarding: boolean;
+    nameservers: {
+        ns1: string;
+        ns2: string;
+        ns3?: string;
+        ns4?: string;
+    };
+}
+
+    
