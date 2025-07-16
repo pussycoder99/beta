@@ -48,7 +48,7 @@ All available products:
 
 Based on this information, do the following:
 1.  **Summary**: Write a single, brief, friendly sentence summarizing what the client has. For example, "It looks like you're set up with web hosting and a domain." or "We see you have an active hosting service with us."
-2.  **Upsell Suggestion**: Identify a key service from the "all products" list that the client does NOT currently have. Formulate a single, friendly sentence suggesting they might be interested in it. For example, "Have you considered registering a unique domain name for your project?" or "To keep your site safe, you might want to look into our backup services." If the user already has most or all services, suggest they contact support for custom solutions or thank them for being a valued customer.
+2.  **Upsell Suggestion**: Identify a key service from the "all products" list that the client does NOT currently have. Formulate a single, friendly sentence suggesting they might be interested in it. For example, "Have you considered registering a unique domain name for your project?" or "To keep your site safe, you might want to look into our backup services." If the client already has every single service listed in "all products", provide a thankful message instead, like "Thank you for being a loyal customer and utilizing all of our services!"
 
 Provide your response in the requested JSON format.`,
 });
