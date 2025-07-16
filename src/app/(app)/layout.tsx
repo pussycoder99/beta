@@ -30,6 +30,7 @@ import {
   LifeBuoy,
   Menu,
   AlertTriangle,
+  History,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,6 +42,7 @@ const navItems = [
   { href: '/domains', label: 'Domains', icon: Globe },
   { href: '/billing', label: 'Billing', icon: CreditCard },
   { href: '/support', label: 'Support', icon: MessageSquare },
+  { href: '/logs', label: 'Logs', icon: History },
 ];
 
 const NavLink = ({ href, children, isActive }: { href: string; children: React.ReactNode, isActive: boolean }) => (
