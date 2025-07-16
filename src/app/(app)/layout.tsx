@@ -6,18 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarInset,
-  SidebarTrigger,
-  SidebarHeader,
-} from '@/components/ui/sidebar';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -36,9 +25,9 @@ import {
   MessageSquare,
   User as UserIcon,
   LogOut,
-  Settings,
   Bell,
   LifeBuoy,
+  Menu,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -68,6 +57,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [open, setOpen] = React.useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -94,57 +84,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarProvider defaultOpen>
-      {/* The sidebar is now mainly for mobile navigation */}
-      <Sidebar variant="sidebar" collapsible="icon">
-        <SidebarHeader className="p-4">
-            <Link href="/dashboard">
-                <Image 
-                    src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" 
-                    alt="SNBD Host Logo" 
-                    width={40} 
-                    height={40} 
-                    className="h-10 w-10 object-contain"
-                />
-            </Link>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            {navItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <Link href={item.href}>
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={{ children: item.label, side: 'right', align: 'center' }}
-                  >
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarContent>
-        <SidebarFooter className="p-2">
-           <SidebarMenu>
-             <SidebarMenuItem>
-                <Link href="/settings">
-                  <SidebarMenuButton
-                    isActive={pathname.startsWith('/settings')}
-                    tooltip={{ children: 'Settings', side: 'right', align: 'center' }}
-                  >
-                    <Settings />
-                    <span>Settings</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            </SidebarMenu>
-        </SidebarFooter>
-      </Sidebar>
-      
-      <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
-          <Link href="/dashboard" className="hidden md:flex items-center gap-2">
+    <div className="flex min-h-screen w-full flex-col bg-background">
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
+          <Link href="/dashboard" className="mr-6 flex items-center gap-2">
             <Image 
                 src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" 
                 alt="SNBD Host Logo" 
@@ -154,18 +96,40 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             />
           </Link>
           
-          {/* Mobile Sidebar Trigger */}
-          <SidebarTrigger className="md:hidden" />
-
-          <nav className="hidden md:flex flex-1 items-center justify-center gap-6">
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex flex-1 items-center justify-start gap-6">
             {navItems.map((item) => (
               <NavLink key={item.href} href={item.href} isActive={pathname.startsWith(item.href)}>
                 {item.label}
               </NavLink>
             ))}
           </nav>
+
+          {/* Mobile Navigation Trigger */}
+          <div className="flex w-full justify-end md:hidden">
+              <Sheet open={open} onOpenChange={setOpen}>
+                  <SheetTrigger asChild>
+                      <Button variant="outline" size="icon">
+                          <Menu className="h-5 w-5" />
+                          <span className="sr-only">Toggle navigation menu</span>
+                      </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left">
+                      <nav className="grid gap-6 text-lg font-medium">
+                          <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold mb-4" onClick={() => setOpen(false)}>
+                              <Image src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" alt="SNBD Host Logo" width={150} height={40} className="h-8 w-auto" />
+                          </Link>
+                          {navItems.map((item) => (
+                              <Link key={item.href} href={item.href} className="text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)}>
+                                  {item.label}
+                              </Link>
+                          ))}
+                      </nav>
+                  </SheetContent>
+              </Sheet>
+          </div>
           
-          <div className="ml-auto flex items-center gap-4">
+          <div className="ml-auto hidden md:flex items-center gap-4">
             <Button variant="ghost" size="icon" className="rounded-full">
               <Bell className="h-5 w-5" />
               <span className="sr-only">Notifications</span>
@@ -205,7 +169,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 p-6 overflow-auto">
           {children}
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </div>
   );
 }
