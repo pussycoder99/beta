@@ -1,31 +1,21 @@
 import type { SVGProps } from 'react';
+import Image from 'next/image';
 
-export const SnbdLogo = (props: SVGProps<SVGSVGElement>) => (
-  // Using a simple text-based SVG logo for SNBD Host
-  // You can replace this with an actual SVG path if you have one
-  <svg viewBox="0 0 200 50" xmlns="http://www.w3.org/2000/svg" {...props}>
-    <text 
-      x="10" 
-      y="35" 
-      fontFamily="Inter, sans-serif" 
-      fontSize="30" 
-      fontWeight="800"
-      fill="hsl(var(--primary))"
-    >
-      SNBD
-    </text>
-    <text 
-      x="105" 
-      y="35" 
-      fontFamily="Inter, sans-serif" 
-      fontSize="30" 
-      fontWeight="500"
-      fill="hsl(var(--foreground))"
-    >
-      HOST
-    </text>
-  </svg>
-);
+export const SnbdLogo = (props: React.ComponentProps<typeof Image>) => {
+  // This component is being deprecated in favor of using <Image> directly
+  // It is kept for backwards compatibility in case it's used somewhere unexpectedly.
+  // New implementations should use <Image> directly with the src URL.
+  return (
+    <Image 
+      src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png"
+      alt="SNBD Host Logo"
+      width={150}
+      height={40}
+      {...props}
+    />
+  );
+};
+
 
 // Placeholder for other custom icons if needed in future.
 // For now, we rely on lucide-react.

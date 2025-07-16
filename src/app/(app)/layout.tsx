@@ -5,6 +5,7 @@ import React, { useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   SidebarProvider,
   Sidebar,
@@ -18,7 +19,6 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { SnbdLogo } from '@/components/icons';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -84,8 +84,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen>
       <Sidebar variant="sidebar" collapsible="icon">
         <SidebarHeader className="p-4">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <SnbdLogo className="h-8 w-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:mx-auto" />
+          <Link href="/dashboard" className="flex items-center justify-center group-data-[collapsible=icon]:justify-start">
+             <Image 
+                src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" 
+                alt="SNBD Host Logo" 
+                width={150} 
+                height={40} 
+                className="h-8 w-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:mx-auto object-contain"
+            />
           </Link>
         </SidebarHeader>
         <SidebarContent>

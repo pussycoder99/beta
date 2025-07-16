@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { SnbdLogo } from '@/components/icons';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -57,7 +57,7 @@ export default function PublicLayout({
             <div className="container mx-auto px-4">
                 <div className="flex items-center justify-between h-20">
                     <Link href="/">
-                        <SnbdLogo className="h-10" />
+                        <Image src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" alt="SNBD Host Logo" width={150} height={40} className="h-10 w-auto" />
                     </Link>
                     <nav className="hidden md:flex items-center gap-8">
                         <NavLink href="/">Home</NavLink>

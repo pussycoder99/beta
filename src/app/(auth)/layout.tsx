@@ -1,5 +1,5 @@
 import React from 'react';
-import { SnbdLogo } from '@/components/icons';
+import Image from 'next/image';
 import Link from 'next/link';
 
 export default function AuthLayout({
@@ -11,7 +11,7 @@ export default function AuthLayout({
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4 dark:bg-gray-900">
       <div className="w-full max-w-md">
         <Link href="/" className="mb-8 flex justify-center">
-          <SnbdLogo className="h-12 w-auto" />
+          <Image src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" alt="SNBD Host Logo" width={200} height={50} className="h-12 w-auto" />
         </Link>
         <div className="dark:bg-card bg-white p-6 sm:p-8 rounded-xl shadow-2xl">
           {children}
