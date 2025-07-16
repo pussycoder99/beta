@@ -58,11 +58,12 @@ export default function RegisterDomainPage() {
   
   const handleAddToCart = (domainName: string) => {
     const whmcsAppUrl = process.env.NEXT_PUBLIC_WHMCS_APP_URL || 'https://portal.snbdhost.com';
-    const cartUrl = `${whmcsAppUrl}/cart.php?a=add&domain=register&query=${domainName}`;
+    // Updated URL to go directly to checkout
+    const cartUrl = `${whmcsAppUrl}/cart.php?a=add&domain=register&query=${domainName}&checkout=true`;
     window.open(cartUrl, '_blank');
     toast({
-      title: 'Redirecting to Cart',
-      description: `Adding ${domainName} to your cart in WHMCS.`,
+      title: 'Redirecting to Checkout',
+      description: `Adding ${domainName} and proceeding to checkout.`,
     });
   };
 
@@ -131,7 +132,7 @@ export default function RegisterDomainPage() {
                             <p className="text-lg">Congratulations! <strong className="font-semibold">{searchResult.domainName}</strong> is available!</p>
                         </div>
                         <Button onClick={() => handleAddToCart(searchResult.domainName)}>
-                            <ShoppingCart className="mr-2" /> Add to Cart
+                            <ShoppingCart className="mr-2" /> Add to Cart & Checkout
                         </Button>
                     </div>
                  ) : (
