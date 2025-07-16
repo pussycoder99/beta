@@ -3,30 +3,53 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell, CreditCard, Globe, Server, ShieldAlert, Ticket as TicketIcon, Loader2 } from 'lucide-react';
+import { 
+    Bell, 
+    CreditCard, 
+    Globe, 
+    Server, 
+    ShieldAlert, 
+    Ticket as TicketIcon, 
+    Loader2,
+    HardDrive,
+    MessagesSquare,
+    LogOut,
+    ShoppingCart,
+    Pencil
+} from 'lucide-react';
 import Link from 'next/link';
 import type { Service, Invoice, Ticket, Domain } from '@/types';
-// Removed direct imports from whmcs-mock-api
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface DashboardStats {
   activeServices: number;
   domainsCount: number;
-  pendingRenewals: number; // Services due in next 30 days
   unpaidInvoices: number;
   openTickets: number;
 }
 
+const StatCard = ({ title, value, icon: Icon, colorClass }: { title: string; value: number; icon: React.ElementType; colorClass: string }) => (
+    <div className="flex-1 bg-card p-4 rounded-lg shadow-sm border-b-4" style={{ borderBottomColor: colorClass }}>
+        <div className="flex items-center justify-between">
+            <div>
+                <div className="text-3xl font-bold">{value}</div>
+                <div className="text-sm text-muted-foreground uppercase">{title}</div>
+            </div>
+            <Icon className="h-10 w-10 text-muted-foreground/50" />
+        </div>
+    </div>
+);
+
+
 export default function DashboardPage() {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [upcomingRenewals, setUpcomingRenewals] = useState<Service[]>([]);
-  const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+  const [activeServices, setActiveServices] = useState<Service[]>([]);
   const [recentTickets, setRecentTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -36,56 +59,44 @@ export default function DashboardPage() {
       const fetchData = async () => {
         setIsLoading(true);
         try {
-          const fetchFromApi = async (endpoint: string, currentToken: string) => {
-            const response = await fetch(endpoint, {
-              headers: {
-                'Authorization': `Bearer ${currentToken}`,
-              },
-            });
+          const fetchFromApi = async (endpoint: string) => {
+            const response = await fetch(endpoint, { headers: { 'Authorization': `Bearer ${token}` } });
             if (!response.ok) {
               const errorData = await response.json().catch(() => ({ message: `Failed to parse error from ${endpoint}` }));
-              console.error(`Error fetching from ${endpoint}: ${response.status}`, errorData);
-              throw new Error(errorData.message || `Failed to fetch from ${endpoint}: ${response.statusText}`);
+              throw new Error(errorData.message || `Failed to fetch from ${endpoint}`);
             }
             return response.json();
           };
           
           const [servicesData, invoicesData, ticketsData, domainsData] = await Promise.all([
-            fetchFromApi('/api/data/services', token),
-            fetchFromApi('/api/data/invoices', token),
-            fetchFromApi('/api/data/tickets', token),
-            fetchFromApi('/api/data/domains', token),
+            fetchFromApi('/api/data/services'),
+            fetchFromApi('/api/data/invoices'),
+            fetchFromApi('/api/data/tickets'),
+            fetchFromApi('/api/data/domains'),
           ]);
 
-          const activeServices = servicesData.services.filter(s => s.status === 'Active').length;
-          
-          const thirtyDaysFromNow = new Date();
-          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-          const pending = servicesData.services.filter(s => 
-            s.status === 'Active' && new Date(s.nextDueDate) <= thirtyDaysFromNow
-          );
-          setUpcomingRenewals(pending.slice(0,3));
-          
-          const unpaid = invoicesData.invoices.filter(i => i.status === 'Unpaid' || i.status === 'Overdue').length;
-          setRecentInvoices(invoicesData.invoices.filter(i => i.status === 'Unpaid' || i.status === 'Overdue').slice(0,3));
+          const active = servicesData.services.filter((s: Service) => s.status === 'Active');
+          setActiveServices(active);
 
-          const open = ticketsData.tickets.filter(t => t.status === 'Open' || t.status === 'Answered' || t.status === 'Customer-Reply').length;
-          setRecentTickets(ticketsData.tickets.filter(t => t.status === 'Open' || t.status === 'Answered' || t.status === 'Customer-Reply').slice(0,3));
+          const unpaid = invoicesData.invoices.filter((i: Invoice) => i.status === 'Unpaid' || i.status === 'Overdue').length;
+          
+          const openTickets = ticketsData.tickets.filter((t: Ticket) => t.status === 'Open' || t.status === 'Answered' || t.status === 'Customer-Reply');
+          setRecentTickets(openTickets.slice(0, 1));
 
-          const activeDomains = domainsData.domains.filter(d => d.status === 'Active').length;
+          const activeDomains = domainsData.domains.filter((d: Domain) => d.status === 'Active').length;
 
           setStats({
-            activeServices,
+            activeServices: active.length,
             domainsCount: activeDomains,
-            pendingRenewals: pending.length,
             unpaidInvoices: unpaid,
-            openTickets: open,
+            openTickets: openTickets.length,
           });
+
         } catch (error) {
           console.error("Failed to fetch dashboard data", error);
           toast({
             title: 'Error Loading Dashboard',
-            description: (error instanceof Error ? error.message : 'Could not load dashboard data.'),
+            description: (error as Error).message,
             variant: 'destructive',
           });
         } finally {
@@ -93,11 +104,8 @@ export default function DashboardPage() {
         }
       };
       fetchData();
-    } else if (!token && user?.id) {
-        setIsLoading(false); // Not attempting to load if token is missing but user object exists
-        console.warn("Dashboard: User present but token is missing. Data fetching skipped.");
-    } else {
-        setIsLoading(false); // Not loading if no user or no token
+    } else if (!user && !token) {
+        setIsLoading(false);
     }
   }, [user?.id, token, toast]);
 
@@ -105,34 +113,22 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-1/3" />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
+        <div className="grid gap-6 md:grid-cols-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
-          <Skeleton className="h-64 rounded-lg" />
-          <Skeleton className="h-64 rounded-lg" />
+        <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-1 space-y-6">
+                <Skeleton className="h-48 rounded-lg" />
+                <Skeleton className="h-32 rounded-lg" />
+            </div>
+            <div className="lg:col-span-2 space-y-6">
+                <Skeleton className="h-64 rounded-lg" />
+            </div>
         </div>
       </div>
     );
   }
   
-  const StatCard = ({ title, value, icon: Icon, link, linkText }: { title: string, value: string | number, icon: React.ElementType, link?: string, linkText?: string}) => (
-    <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-5 w-5 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {link && linkText && (
-           <Link href={link} className="text-xs text-muted-foreground hover:text-primary transition-colors">
-            {linkText}
-          </Link>
-        )}
-      </CardContent>
-    </Card>
-  );
-
   if (!user) {
      return (
       <div className="flex flex-col items-center justify-center h-full">
@@ -143,120 +139,161 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-foreground">Welcome, {user?.firstName}!</h1>
-      
-      {stats && stats.unpaidInvoices > 0 && (
-        <Alert variant="destructive" className="shadow-md">
-          <ShieldAlert className="h-5 w-5" />
-          <AlertTitle className="font-semibold">You have {stats.unpaidInvoices} unpaid invoice(s)!</AlertTitle>
-          <AlertDescription>
-            Please settle your outstanding invoices to avoid service interruption.
-            <Link href="/billing" className="ml-2 font-medium text-destructive-foreground underline">
-              View Invoices
-            </Link>
-          </AlertDescription>
+    <div className="space-y-6">
+        <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-semibold">Client Area</h1>
+            <p className="text-sm text-muted-foreground">Portal Home / Client Area</p>
+        </div>
+
+        <Alert variant="default" className="bg-yellow-100 dark:bg-yellow-900/30 border-yellow-500/50 text-yellow-800 dark:text-yellow-200">
+            <ShieldAlert className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+            <AlertTitle className="font-semibold">Please check your email and follow the link to verify your email address.</AlertTitle>
+            <Button variant="outline" size="sm" className="absolute top-3 right-3">Resend Verification Email</Button>
         </Alert>
-      )}
 
-      {stats && stats.pendingRenewals > 0 && ! (stats.unpaidInvoices > 0) && (
-         <Alert variant="default" className="border-primary/50 text-primary shadow-md bg-primary/10">
-          <Bell className="h-5 w-5 text-primary" />
-          <AlertTitle className="font-semibold text-primary">Upcoming Renewals</AlertTitle>
-          <AlertDescription className="text-primary/80">
-            You have {stats.pendingRenewals} service(s) due for renewal soon.
-            <Link href="/services" className="ml-2 font-medium text-primary underline">
-              Manage Services
-            </Link>
-          </AlertDescription>
-        </Alert>
-      )}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column */}
+            <aside className="lg:col-span-3 space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Your Info</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-1">
+                        <p className="font-bold">{user.firstName} {user.lastName}</p>
+                        <p>{user.address1}</p>
+                        <p>{user.city}, {user.state} {user.postcode}</p>
+                        <p>{user.country}</p>
+                    </CardContent>
+                    <CardFooter>
+                        <Button variant="secondary" className="w-full bg-green-600 hover:bg-green-700 text-white"><Pencil className="mr-2 h-4 w-4"/>Update</Button>
+                    </CardFooter>
+                </Card>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Active Services" value={stats?.activeServices ?? 0} icon={Server} link="/services" linkText="View services" />
-        <StatCard title="Active Domains" value={stats?.domainsCount ?? 0} icon={Globe} link="/domains" linkText="Manage domains" />
-        <StatCard title="Unpaid Invoices" value={stats?.unpaidInvoices ?? 0} icon={CreditCard} link="/billing" linkText="Pay invoices" />
-        <StatCard title="Open Tickets" value={stats?.openTickets ?? 0} icon={TicketIcon} link="/support" linkText="View tickets" />
-      </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Contacts</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground">No Contacts Found</p>
+                    </CardContent>
+                    <CardFooter>
+                        <Button variant="outline" className="w-full">+ New Contact...</Button>
+                    </CardFooter>
+                </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Upcoming Renewals</CardTitle>
-            <CardDescription>Services nearing their renewal date.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {upcomingRenewals.length > 0 ? (
-              <ul className="space-y-3">
-                {upcomingRenewals.map(service => (
-                  <li key={service.id} className="flex justify-between items-center p-3 bg-card-foreground/5 rounded-md">
-                    <div>
-                      <p className="font-medium">{service.name}</p>
-                      <p className="text-sm text-muted-foreground">Due: {service.nextDueDate} - {service.amount}</p>
-                    </div>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/services`}>Renew</Link>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground">No upcoming renewals in the next 30 days.</p>
-            )}
-          </CardContent>
-        </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Shortcuts</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                         <Link href="/services/order" className="flex items-center gap-2 text-sm hover:text-primary"><ShoppingCart/> Order New Services</Link>
+                         <Link href="/domains" className="flex items-center gap-2 text-sm hover:text-primary"><Globe/> Register a New Domain</Link>
+                         <button onClick={logout} className="flex items-center gap-2 text-sm hover:text-primary w-full"><LogOut/> Logout</button>
+                    </CardContent>
+                </Card>
+            </aside>
 
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest invoices and support tickets.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <h3 className="text-md font-semibold mb-2">Outstanding Invoices</h3>
-            {recentInvoices.length > 0 ? (
-              <ul className="space-y-3 mb-4">
-                {recentInvoices.map(invoice => (
-                  <li key={invoice.id} className={`flex justify-between items-center p-3 rounded-md ${invoice.status === 'Overdue' ? 'bg-destructive/10' : 'bg-card-foreground/5'}`}>
-                    <div>
-                      <p className="font-medium">Invoice #{invoice.invoiceNumber}</p>
-                      <p className={`text-sm ${invoice.status === 'Overdue' ? 'text-destructive' : 'text-muted-foreground'}`}>
-                        Due: {invoice.dueDate} - {invoice.total} ({invoice.status})
-                      </p>
-                    </div>
-                     <Button variant={invoice.status === 'Overdue' ? 'destructive' : 'outline'} size="sm" asChild>
-                      <Link href={`/billing`}>Pay Now</Link>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground mb-4">No outstanding invoices.</p>
-            )}
-             <h3 className="text-md font-semibold mb-2 mt-4">Active Support Tickets</h3>
-            {recentTickets.length > 0 ? (
-              <ul className="space-y-3">
-                {recentTickets.map(ticket => {
-                  // Ensure ticket.id is a string for the href, provide a fallback if necessary
-                  const ticketHref = ticket && typeof ticket.id === 'string' && ticket.id.trim() !== '' ? `/support/${ticket.id}` : '/support';
-                  return (
-                    <li key={ticket.id} className="flex justify-between items-center p-3 bg-card-foreground/5 rounded-md">
-                      <div>
-                        <p className="font-medium">{ticket.subject}</p>
-                        <p className="text-sm text-muted-foreground">Status: {ticket.status} - Last Update: {ticket.lastUpdated}</p>
-                      </div>
-                       <Button variant="outline" size="sm" asChild>
-                        <Link href={ticketHref}>View</Link>
-                      </Button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground">No active support tickets.</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            {/* Right Column */}
+            <main className="lg:col-span-9 space-y-6">
+                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <StatCard title="Services" value={stats?.activeServices ?? 0} icon={HardDrive} colorClass="#4CAF50" />
+                    <StatCard title="Domains" value={stats?.domainsCount ?? 0} icon={Globe} colorClass="#2196F3" />
+                    <StatCard title="Tickets" value={stats?.openTickets ?? 0} icon={MessagesSquare} colorClass="#FF5722" />
+                    <StatCard title="Invoices" value={stats?.unpaidInvoices ?? 0} icon={CreditCard} colorClass="#FFC107" />
+                </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Sitejet Builder</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex items-center gap-6">
+                        <div className="w-1/3">
+                           <img src="https://assets.sitejet.io/images/temp/logo-sitejet-500.png" alt="Sitejet Logo" />
+                        </div>
+                        <div className="flex-1 flex items-center gap-2">
+                             <Label htmlFor="sitejet-website" className="whitespace-nowrap">Choose a website to manage:</Label>
+                             <Select defaultValue={activeServices.length > 0 ? activeServices[0].domain : undefined}>
+                                <SelectTrigger id="sitejet-website">
+                                    <SelectValue placeholder="Select a site" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {activeServices.map(service => (
+                                        <SelectItem key={service.id} value={service.domain || service.id}>{service.domain}</SelectItem>
+                                    ))}
+                                    {activeServices.length === 0 && <SelectItem value="no-sites" disabled>No websites found</SelectItem>}
+                                </SelectContent>
+                             </Select>
+                             <Button>Edit Website</Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle className="text-lg">Your Active Products/Services</CardTitle>
+                         <Button variant="outline" size="sm" asChild><Link href="/services">My Services</Link></Button>
+                    </CardHeader>
+                    <CardContent>
+                        {activeServices.length > 0 ? (
+                            activeServices.slice(0, 1).map(service => (
+                                <div key={service.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">Active</span>
+                                        <div>
+                                            <p className="font-semibold">{service.name}</p>
+                                            <p className="text-sm text-muted-foreground">{service.domain}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="secondary">Edit with Sitejet</Button>
+                                        <Button variant="outline">Log in to cPanel</Button>
+                                        <Button variant="outline" asChild><Link href={`/services/${service.id}`}>View Details</Link></Button>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-muted-foreground text-sm">No active services found.</p>
+                        )}
+                        {activeServices.length > 1 && (
+                             <Link href="/services" className="text-sm text-primary hover:underline mt-2 inline-block">View More...</Link>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle className="text-lg">Recent Support Tickets</CardTitle>
+                            <Button variant="outline" size="sm" asChild><Link href="/support/new">+ Open New Ticket</Link></Button>
+                        </CardHeader>
+                        <CardContent>
+                           {recentTickets.length > 0 ? (
+                               recentTickets.map(ticket => (
+                                   <div key={ticket.id} className="text-sm">
+                                       <Link href={`/support/${ticket.id}`} className="font-semibold text-primary hover:underline">{ticket.subject}</Link>
+                                       <p className="text-muted-foreground">Last Updated: {ticket.lastUpdated}</p>
+                                   </div>
+                               ))
+                           ) : (
+                                <p className="text-sm text-muted-foreground">No Recent Tickets Found. If you need any help, please <Link href="/support/new" className="text-primary underline">open a ticket</Link>.</p>
+                           )}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Register a New Domain</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex items-center gap-2">
+                            <Input placeholder="yourdomain.com" />
+                            <Button variant="secondary" className="bg-green-600 hover:bg-green-700 text-white">Register</Button>
+                            <Button variant="outline">Transfer</Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            </main>
+        </div>
     </div>
   );
 }
+
+    
