@@ -20,13 +20,15 @@ import {
     MessagesSquare,
     LogOut,
     ShoppingCart,
-    Pencil
+    Pencil,
+    Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
-import type { Service, Invoice, Ticket, Domain } from '@/types';
+import type { Service, Invoice, Ticket, Domain, Product } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { summarizeClient, type SummarizeClientOutput } from '@/ai/flows/summarize-client-flow';
 
 interface DashboardStats {
   activeServices: number;
@@ -54,12 +56,15 @@ export default function DashboardPage() {
   const [activeServices, setActiveServices] = useState<Service[]>([]);
   const [recentTickets, setRecentTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [aiSummary, setAiSummary] = useState<SummarizeClientOutput | null>(null);
+  const [isAiSummaryLoading, setIsAiSummaryLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
     if (user?.id && token) {
       const fetchData = async () => {
         setIsLoading(true);
+        setIsAiSummaryLoading(true);
         try {
           const fetchFromApi = async (endpoint: string) => {
             const response = await fetch(endpoint, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -70,11 +75,12 @@ export default function DashboardPage() {
             return response.json();
           };
           
-          const [servicesData, invoicesData, ticketsData, domainsData] = await Promise.all([
+          const [servicesData, invoicesData, ticketsData, domainsData, productsData] = await Promise.all([
             fetchFromApi('/api/data/services'),
             fetchFromApi('/api/data/invoices'),
             fetchFromApi('/api/data/tickets'),
             fetchFromApi('/api/data/domains'),
+            fetchFromApi('/api/data/products'), // Fetch all products for AI summary
           ]);
 
           const active = servicesData.services.filter((s: Service) => s.status === 'Active');
@@ -94,6 +100,14 @@ export default function DashboardPage() {
             openTickets: openTickets.length,
           });
 
+          // Once data is fetched, call the AI flow
+          if (productsData.products) {
+            const clientServiceNames = active.map(s => s.name);
+            const allProductNames = productsData.products.map((p: Product) => p.name);
+            const summary = await summarizeClient({ clientServices: clientServiceNames, allProducts: allProductNames });
+            setAiSummary(summary);
+          }
+
         } catch (error) {
           console.error("Failed to fetch dashboard data", error);
           toast({
@@ -103,11 +117,13 @@ export default function DashboardPage() {
           });
         } finally {
           setIsLoading(false);
+          setIsAiSummaryLoading(false);
         }
       };
       fetchData();
     } else if (!user && !token) {
         setIsLoading(false);
+        setIsAiSummaryLoading(false);
     }
   }, [user?.id, token, toast]);
 
@@ -203,6 +219,30 @@ export default function DashboardPage() {
                     <StatCard title="Tickets" value={stats?.openTickets ?? 0} icon={MessagesSquare} colorClass="#FF5722" />
                     <StatCard title="Invoices" value={stats?.unpaidInvoices ?? 0} icon={CreditCard} colorClass="#FFC107" />
                 </div>
+
+                <Card className="bg-gradient-to-br from-primary/10 to-background">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <Sparkles className="text-primary"/>
+                            AI Account Summary
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {isAiSummaryLoading ? (
+                             <div className="space-y-2">
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-4 w-1/2" />
+                            </div>
+                        ) : aiSummary ? (
+                            <div className="space-y-1">
+                                <p className="text-foreground/90">{aiSummary.summary}</p>
+                                <p className="text-muted-foreground">{aiSummary.upsellSuggestion}</p>
+                            </div>
+                        ) : (
+                            <p className="text-muted-foreground">Could not generate an AI summary at this time.</p>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <Card>
                     <CardHeader>
