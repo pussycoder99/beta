@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, ShoppingCart, ShieldCheck, Dns, Forward } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, ShieldCheck, Database, Forward } from 'lucide-react';
 import Link from 'next/link';
 
 function ConfigureDomainContent() {
@@ -105,7 +105,7 @@ function ConfigureDomainContent() {
                                     <Checkbox id="dnsManagement" />
                                     <div className="grid gap-1.5 leading-none">
                                         <label htmlFor="dnsManagement" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex items-center gap-2">
-                                            <Dns className="h-4 w-4 text-primary"/> DNS Management
+                                            <Database className="h-4 w-4 text-primary"/> DNS Management
                                         </label>
                                         <p className="text-sm text-muted-foreground">Free - Host your own DNS with us.</p>
                                     </div>
