@@ -9,7 +9,6 @@ import Image from 'next/image';
 import {
   SidebarProvider,
   Sidebar,
-  SidebarHeader,
   SidebarContent,
   SidebarFooter,
   SidebarMenu,
@@ -17,6 +16,7 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
+  SidebarHeader,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -50,6 +51,18 @@ const navItems = [
   { href: '/billing', label: 'Billing', icon: CreditCard },
   { href: '/support', label: 'Support', icon: MessageSquare },
 ];
+
+const NavLink = ({ href, children, isActive }: { href: string; children: React.ReactNode, isActive: boolean }) => (
+    <Link 
+        href={href} 
+        className={cn(
+            "text-sm font-medium transition-colors hover:text-primary",
+            isActive ? "text-primary font-semibold" : "text-muted-foreground"
+        )}
+    >
+        {children}
+    </Link>
+);
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, isLoading, isAuthenticated } = useAuth();
@@ -82,17 +95,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen>
+      {/* The sidebar is now mainly for mobile navigation */}
       <Sidebar variant="sidebar" collapsible="icon">
         <SidebarHeader className="p-4">
-          <Link href="/dashboard" className="flex items-center justify-center group-data-[collapsible=icon]:justify-start">
-             <Image 
-                src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" 
-                alt="SNBD Host Logo" 
-                width={150} 
-                height={40} 
-                className="h-8 w-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:mx-auto object-contain"
-            />
-          </Link>
+            <Link href="/dashboard">
+                <Image 
+                    src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" 
+                    alt="SNBD Host Logo" 
+                    width={40} 
+                    height={40} 
+                    className="h-10 w-10 object-contain"
+                />
+            </Link>
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
@@ -127,9 +141,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
+      
       <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
+          <Link href="/dashboard" className="hidden md:flex items-center gap-2">
+            <Image 
+                src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" 
+                alt="SNBD Host Logo" 
+                width={150} 
+                height={40} 
+                className="h-8 w-auto"
+            />
+          </Link>
+          
+          {/* Mobile Sidebar Trigger */}
           <SidebarTrigger className="md:hidden" />
+
+          <nav className="hidden md:flex flex-1 items-center justify-center gap-6">
+            {navItems.map((item) => (
+              <NavLink key={item.href} href={item.href} isActive={pathname.startsWith(item.href)}>
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+          
           <div className="ml-auto flex items-center gap-4">
             <Button variant="ghost" size="icon" className="rounded-full">
               <Bell className="h-5 w-5" />
@@ -139,7 +174,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={`https://placehold.co/100x100.png?text=${getInitials(user?.firstName)}`} alt={user?.firstName} data-ai-hint="user avatar" />
+                    <AvatarImage src={`https://placehold.co/100x100.png?text=${getInitials(user?.firstName)}`} alt={user?.firstName || ''} data-ai-hint="user avatar" />
                     <AvatarFallback>{user ? getInitials(user.firstName + ' ' + user.lastName) : 'U'}</AvatarFallback>
                   </Avatar>
                 </Button>
