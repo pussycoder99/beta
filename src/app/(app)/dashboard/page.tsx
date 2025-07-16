@@ -183,7 +183,11 @@ export default function DashboardPage() {
                         <p>{user.country}</p>
                     </CardContent>
                     <CardFooter>
-                        <Button variant="secondary" className="w-full bg-green-600 hover:bg-green-700 text-white"><Pencil className="mr-2 h-4 w-4"/>Update</Button>
+                        <Button asChild variant="secondary" className="w-full bg-green-600 hover:bg-green-700 text-white">
+                            <Link href="/settings/profile">
+                                <Pencil className="mr-2 h-4 w-4"/>Update
+                            </Link>
+                        </Button>
                     </CardFooter>
                 </Card>
 
