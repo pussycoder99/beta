@@ -31,6 +31,7 @@ import {
   Menu,
   AlertTriangle,
   History,
+  Bot,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -42,6 +43,7 @@ const navItems = [
   { href: '/domains', label: 'Domains', icon: Globe },
   { href: '/billing', label: 'Billing', icon: CreditCard },
   { href: '/support', label: 'Support', icon: MessageSquare },
+  { href: '/ai-hoster', label: 'AI Hoster', icon: Bot },
   { href: '/logs', label: 'Logs', icon: History },
 ];
 
