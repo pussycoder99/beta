@@ -8,6 +8,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ import {
   Bell,
   LifeBuoy,
   Menu,
+  AlertTriangle,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -85,8 +87,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-gray-50">
+       <div className="bg-yellow-100 text-yellow-800 p-2 text-center text-sm flex items-center justify-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            <span>This is a BETA application. Some features may not work as expected.</span>
+       </div>
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-4 md:px-6">
-          <Link href="/dashboard" className="mr-6 flex items-center gap-2">
+          <Link href="/dashboard" className="mr-4 flex items-center gap-2">
             <Image 
                 src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" 
                 alt="SNBD Host Logo" 
@@ -94,6 +100,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 height={40} 
                 className="h-8 w-auto"
             />
+             <Badge variant="outline" className="border-primary text-primary">BETA</Badge>
           </Link>
           
           {/* Desktop Navigation */}
