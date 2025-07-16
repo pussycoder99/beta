@@ -4,9 +4,44 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Palette, Bug, Shield, PlusCircle, History } from 'lucide-react';
+import { FileText, Palette, Bug, Shield, PlusCircle, History, ShoppingCart, CreditCard, Link as LinkIcon, Globe } from 'lucide-react';
 
 const logData = [
+    {
+        icon: Globe,
+        title: "Feature: Integrated Domain Ordering & Configuration",
+        description: "Implemented a seamless domain ordering flow. Users can now search for a domain, configure it with addons and nameservers, select a payment method, and proceed directly to a WHMCS-generated invoice for payment, all from within the application.",
+        timestamp: "2024-07-30 10:00 AM",
+        tags: ["feature", "domains", "api", "billing"],
+    },
+    {
+        icon: CreditCard,
+        title: "Feature: Dynamic Payment Methods from WHMCS",
+        description: "The 'Add Funds' and 'Domain Configuration' pages now fetch available payment methods directly from the WHMCS API, ensuring users always see the correct payment options.",
+        timestamp: "2024-07-30 09:45 AM",
+        tags: ["feature", "billing", "api"],
+    },
+    {
+        icon: LinkIcon,
+        title: "Enhancement: Add Funds to Invoice Redirect",
+        description: "Improved the 'Add Funds' workflow. After submitting the amount, users are now automatically redirected to the generated WHMCS invoice to complete their payment.",
+        timestamp: "2024-07-30 09:30 AM",
+        tags: ["enhancement", "billing", "ui"],
+    },
+    {
+        icon: Bug,
+        title: "Fix: Domain Configuration Page Crash",
+        description: "Resolved a build error on the Domain Configuration page caused by an incorrect icon import. Replaced the non-existent 'Dns' icon with the 'Database' icon.",
+        timestamp: "2024-07-30 09:15 AM",
+        tags: ["fix", "domains", "ui"],
+    },
+    {
+        icon: ShoppingCart,
+        title: "Feature: Integrated Service & Domain Order Pages",
+        description: "Created new pages for ordering services and registering domains. The service order page fetches products from WHMCS, and the domain registration page mimics the WHMCS layout, preparing for full API integration.",
+        timestamp: "2024-07-29 11:30 AM",
+        tags: ["feature", "services", "domains", "ui"],
+    },
     {
         icon: PlusCircle,
         title: "Feature: Changelog Page Added",
@@ -53,6 +88,10 @@ const tagColors: { [key: string]: string } = {
     auth: "bg-yellow-500 text-black",
     dashboard: "bg-indigo-500",
     theme: "bg-pink-500",
+    domains: "bg-teal-500",
+    services: "bg-cyan-500",
+    billing: "bg-lime-600",
+    enhancement: "bg-sky-500",
 };
 
 
@@ -80,7 +119,7 @@ export default function LogsPage() {
                     
                     <div className="col-start-2">
                         <p className="text-foreground/90">{log.description}</p>
-                         <div className="mt-2 flex gap-2">
+                         <div className="mt-2 flex gap-2 flex-wrap">
                             {log.tags.map(tag => (
                                 <Badge key={tag} className={`capitalize ${tagColors[tag] || 'bg-gray-500'} hover:${tagColors[tag] || 'bg-gray-500'}`}>
                                     {tag}
