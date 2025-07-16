@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CreditCard, DollarSign, Download, FileText, PlusCircle, Loader2 } from 'lucide-react';
+import { CreditCard, DollarSign, Download, FileText, PlusCircle, Loader2, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,6 +33,9 @@ export default function BillingPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  
+  const whmcsAppUrl = process.env.NEXT_PUBLIC_WHMCS_APP_URL || 'https://portal.snbdhost.com';
+
 
   useEffect(() => {
     if (user?.id && token) { // Check for token
@@ -77,14 +80,13 @@ export default function BillingPage() {
 
   const handlePayInvoice = (invoiceId: string) => {
     // In a real app, redirect to WHMCS payment gateway or a payment page
-    // Example: window.open(`https://portal.snbdhost.com/viewinvoice.php?id=${invoiceId}`, '_blank');
-    toast({ title: 'Payment Action', description: `Redirecting to pay invoice ${invoiceId} (mocked).`});
+    window.open(`${whmcsAppUrl}/viewinvoice.php?id=${invoiceId}`, '_blank');
   };
 
   const handleDownloadPdf = (invoiceId: string) => {
     // In a real app, this would link to the WHMCS PDF download URL
-    // Example: window.open(`https://portal.snbdhost.com/dl.php?type=i&id=${invoiceId}`, '_blank');
-    toast({ title: 'Download Action', description: `Downloading PDF for invoice ${invoiceId} (mocked).`});
+    window.open(`${whmcsAppUrl}/dl.php?type=i&id=${invoiceId}`, '_blank');
+    toast({ title: 'Download Action', description: `Opening PDF download for invoice ${invoiceId}.`});
   };
   
   if (isLoading) {
@@ -149,6 +151,11 @@ export default function BillingPage() {
                     <TableCell>{invoice.total}</TableCell>
                     <TableCell><StatusBadge status={invoice.status} /></TableCell>
                     <TableCell className="text-right space-x-1">
+                       <Button variant="ghost" size="icon" title="View Invoice" asChild>
+                          <Link href={`${whmcsAppUrl}/viewinvoice.php?id=${invoice.id}`} target="_blank">
+                             <Eye className="h-4 w-4" />
+                          </Link>
+                       </Button>
                        <Button variant="ghost" size="icon" title="Download PDF" onClick={() => handleDownloadPdf(invoice.id)}>
                         <Download className="h-4 w-4" />
                       </Button>
@@ -168,4 +175,3 @@ export default function BillingPage() {
     </div>
   );
 }
-
