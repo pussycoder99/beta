@@ -25,7 +25,7 @@ const NavDropdown = ({ title, children }: { title: string, children: React.React
                 <ChevronDown className="ml-1 h-4 w-4" />
             </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="bg-white">
+        <DropdownMenuContent>
             {children}
         </DropdownMenuContent>
     </DropdownMenu>
@@ -45,12 +45,9 @@ export default function PublicLayout({
 }) {
   return (
     <div className="public-light bg-white">
-        <div className="border-b">
-            <div className="container mx-auto px-4">
-                <div className="flex justify-between items-center py-2 text-sm text-gray-600">
-                    <p>Don&apos;t Hesitate to try us out. Its FREE! Takes 1 Minute to sign up and Get 14 Days of FREE Singapore Premium Hosting!</p>
-                    <p>What else do you need to speed up your online presence?</p>
-                </div>
+        <div className="bg-primary text-primary-foreground">
+            <div className="container mx-auto px-4 py-2 text-center text-xs sm:text-sm">
+                <p>Don&apos;t Hesitate to try us out. Its FREE! Takes 1 Minute to sign up and Get 14 Days of FREE Singapore Premium Hosting! What else do you need to speed up your online presence?</p>
             </div>
         </div>
         <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b">
@@ -67,7 +64,7 @@ export default function PublicLayout({
                            <DropdownLink href="/services/order">VPS Hosting</DropdownLink>
                         </NavDropdown>
                         <NavLink href="#">NBN Automation Hosting</NavLink>
-                        <NavLink href="#">Domain</NavLink>
+                        <NavLink href="/domains">Domain</NavLink>
                          <NavDropdown title="Servers">
                            <DropdownLink href="#">Dedicated Servers</DropdownLink>
                            <DropdownLink href="#">Managed Servers</DropdownLink>
@@ -75,7 +72,7 @@ export default function PublicLayout({
                         <NavLink href="/support">Support</NavLink>
                         <NavLink href="#">Contact</NavLink>
                     </nav>
-                    <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg shadow-md hover:shadow-lg transition-shadow">
+                    <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md shadow-md hover:shadow-lg transition-shadow">
                         <Link href="/login">My Dashboard</Link>
                     </Button>
                 </div>
