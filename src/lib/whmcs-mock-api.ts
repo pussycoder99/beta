@@ -1,5 +1,6 @@
 
-import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail } from '@/types';
+
+import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail, DomainSearchResult } from '@/types';
 import { format } from 'date-fns';
 
 const WHMCS_API_URL = process.env.NEXT_PUBLIC_WHMCS_API_URL;
@@ -590,5 +591,57 @@ export const getProductsWHMCS = async (gid?: string): Promise<{ products: Produc
   } catch (error) {
     console.error("[WHMCS API SERVER CATCH ERROR - getProductsWHMCS] Failed to fetch products:", error);
     return { products: [] };
+  }
+};
+
+
+export const domainWhoisWHMCS = async (domain: string): Promise<{ result: DomainSearchResult, whmcsData?: any }> => {
+  try {
+    const data = await callWhmcsApi('DomainWhois', { domain });
+    
+    if (data.result === 'success') {
+      const status = data.status === 'available' ? 'available' : 'unavailable';
+      const searchResult: DomainSearchResult = {
+        domainName: domain,
+        status: status,
+      };
+      
+      // Attempt to get pricing if available
+      if (status === 'available' && data.whois) {
+         try {
+            const whoisData = JSON.parse(data.whois);
+            if (whoisData.domainprice && whoisData.regperiod) {
+                 searchResult.pricing = {
+                    register: whoisData.domainprice,
+                    period: whoisData.regperiod
+                };
+            }
+         } catch(e){
+            // It's common for whois not to be valid JSON, so we ignore parse errors.
+         }
+      }
+
+      return { result: searchResult, whmcsData: data };
+    } else {
+      // If the API call itself fails, return an error status
+      return { 
+        result: {
+          domainName: domain,
+          status: 'error',
+          errorMessage: data.message || 'Domain check failed at the API level.'
+        }, 
+        whmcsData: data 
+      };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error during domain check.";
+    console.error(`[WHMCS API SERVER CATCH ERROR] Failed to check domain whois for ${domain}:`, error);
+    return {
+      result: {
+        domainName: domain,
+        status: 'error',
+        errorMessage: errorMessage
+      }
+    };
   }
 };

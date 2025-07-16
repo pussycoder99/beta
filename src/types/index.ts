@@ -1,4 +1,5 @@
 
+
 export interface User {
   id: string;
   email: string;
@@ -139,3 +140,12 @@ export interface Product {
   quantity_available?: number;
 }
 
+export interface DomainSearchResult {
+  domainName: string;
+  status: 'available' | 'unavailable' | 'error';
+  pricing?: {
+    register: string; // "10.99"
+    period: string; // "1"
+  };
+  errorMessage?: string;
+}

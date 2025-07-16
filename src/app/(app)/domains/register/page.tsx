@@ -1,13 +1,16 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Globe, Server, ArrowRight } from 'lucide-react';
+import { Search, Globe, Server, ArrowRight, Loader2, XCircle, CheckCircle, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
+import type { DomainSearchResult } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const tldPricing = [
   { tld: '.com', newPrice: '1,099.00', transfer: '1,499.00', renewal: '1,550.00' },
@@ -19,6 +22,49 @@ const tldPricing = [
 
 export default function RegisterDomainPage() {
   const [activeCategory, setActiveCategory] = useState('Popular');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchResult, setSearchResult] = useState<DomainSearchResult | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const handleSearch = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) {
+      setSearchError("Please enter a domain name to search.");
+      return;
+    }
+
+    setIsLoading(true);
+    setSearchResult(null);
+    setSearchError(null);
+
+    try {
+      const response = await fetch(`/api/domains/check?domain=${encodeURIComponent(searchQuery)}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to check domain availability.");
+      }
+      setSearchResult(data.result);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+      setSearchError(errorMessage);
+      toast({ title: "Search Error", description: errorMessage, variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleAddToCart = (domainName: string) => {
+    const whmcsAppUrl = process.env.NEXT_PUBLIC_WHMCS_APP_URL || 'https://portal.snbdhost.com';
+    const cartUrl = `${whmcsAppUrl}/cart.php?a=add&domain=register&query=${domainName}`;
+    window.open(cartUrl, '_blank');
+    toast({
+      title: 'Redirecting to Cart',
+      description: `Adding ${domainName} to your cart in WHMCS.`,
+    });
+  };
 
   const categories = [
     { name: 'Popular', count: 5 },
@@ -40,21 +86,65 @@ export default function RegisterDomainPage() {
         <CardContent className="p-8 relative">
             <Globe className="absolute -right-10 -top-10 h-48 w-48 text-amber-500/20" />
             <div className="relative max-w-2xl mx-auto">
-                <div className="relative">
-                    <Input
-                    type="search"
-                    placeholder="Find your new domain name"
-                    className="w-full pl-10 pr-24 h-14 text-lg rounded-full shadow-lg"
-                    />
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground" />
-                    <Button size="lg" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full h-11">
-                    <Search className="mr-2 h-4 w-4" /> Search
-                    </Button>
-                </div>
+                <form onSubmit={handleSearch}>
+                    <div className="relative">
+                        <Input
+                        type="search"
+                        placeholder="Find your new domain name"
+                        className="w-full pl-10 pr-24 h-14 text-lg rounded-full shadow-lg"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground" />
+                        <Button type="submit" size="lg" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full h-11" disabled={isLoading}>
+                            {isLoading ? <Loader2 className="animate-spin" /> : <Search />}
+                            <span className="sr-only sm:not-sr-only">Search</span>
+                        </Button>
+                    </div>
+                </form>
             </div>
         </CardContent>
       </Card>
       
+      {isLoading && (
+         <div className="text-center p-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <p className="mt-2 text-muted-foreground">Checking domain availability...</p>
+        </div>
+      )}
+
+      {searchError && (
+        <Alert variant="destructive">
+            <XCircle className="h-4 w-4" />
+            <AlertTitle>Search Failed</AlertTitle>
+            <AlertDescription>{searchError}</AlertDescription>
+        </Alert>
+      )}
+
+      {searchResult && (
+        <Card>
+            <CardContent className="p-4">
+                 {searchResult.status === 'available' ? (
+                     <div className="flex items-center justify-between p-4 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                            <CheckCircle className="h-6 w-6 text-green-600"/>
+                            <p className="text-lg">Congratulations! <strong className="font-semibold">{searchResult.domainName}</strong> is available!</p>
+                        </div>
+                        <Button onClick={() => handleAddToCart(searchResult.domainName)}>
+                            <ShoppingCart className="mr-2" /> Add to Cart
+                        </Button>
+                    </div>
+                 ) : (
+                    <div className="flex items-center gap-3 p-4 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                        <XCircle className="h-6 w-6 text-red-600"/>
+                        <p className="text-lg">Sorry, <strong className="font-semibold">{searchResult.domainName}</strong> is already taken.</p>
+                    </div>
+                 )}
+            </CardContent>
+        </Card>
+      )}
+
+
       <div>
         <h2 className="text-lg font-semibold mb-2">Browse extensions by category</h2>
         <div className="flex flex-wrap gap-2">
