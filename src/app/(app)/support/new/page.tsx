@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -10,14 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { openTicketAPI } from '@/lib/whmcs-mock-api';
 import Link from 'next/link';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 
 type Priority = 'Low' | 'Medium' | 'High';
 
 export default function NewTicketPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [subject, setSubject] = useState('');
@@ -32,19 +32,35 @@ export default function NewTicketPage() {
       toast({ title: 'Error', description: 'Please fill in all required fields.', variant: 'destructive' });
       return;
     }
-    if (!user?.id) {
+    if (!user?.id || !token) {
       toast({ title: 'Error', description: 'User not authenticated.', variant: 'destructive' });
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await openTicketAPI(user.id, { subject, department, message, priority });
-      if (response.result === 'success' && response.ticketId) {
+      const response = await fetch('/api/data/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+        body: JSON.stringify({ 
+          userId: user.id, 
+          subject, 
+          department, 
+          message, 
+          priority 
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to open ticket.');
+      }
+
+      if (data.ticketId) {
         toast({ title: 'Ticket Created', description: 'Your support ticket has been opened successfully.' });
-        router.push(`/support/${response.ticketId}`);
+        router.push(`/support/${data.ticketId}`);
       } else {
-        throw new Error(response.message || 'Failed to open ticket.');
+        throw new Error('Ticket ID was not returned from the server.');
       }
     } catch (error) {
       toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });

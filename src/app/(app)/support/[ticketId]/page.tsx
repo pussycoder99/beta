@@ -1,10 +1,10 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import type { Ticket, TicketReply } from '@/types';
-import { getTicketByIdAPI, replyToTicketAPI } from '@/lib/whmcs-mock-api';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { ArrowLeft, Send, User, MessageSquare, Clock, Tag, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, MessageSquare } from 'lucide-react';
 
 const TicketStatusBadge = ({ status }: { status: Ticket['status'] }) => {
   let className = "text-white";
@@ -27,7 +27,7 @@ const TicketStatusBadge = ({ status }: { status: Ticket['status'] }) => {
 };
 
 export default function ViewTicketPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const params = useParams();
   const ticketId = params.ticketId as string;
   const { toast } = useToast();
@@ -39,24 +39,30 @@ export default function ViewTicketPage() {
   const [isReplying, setIsReplying] = useState(false);
 
   useEffect(() => {
-    if (user?.id && ticketId) {
+    if (user?.id && ticketId && token) {
       setIsLoading(true);
-      getTicketByIdAPI(user.id, ticketId)
-        .then(({ ticket: fetchedTicket }) => {
-          if (fetchedTicket) {
-            setTicket(fetchedTicket);
-          } else {
-            toast({ title: 'Error', description: 'Ticket not found or access denied.', variant: 'destructive' });
-            router.push('/support');
-          }
-        })
-        .catch(error => {
-          console.error("Failed to fetch ticket", error);
-          toast({ title: 'Error', description: 'Could not load ticket details.', variant: 'destructive' });
-        })
-        .finally(() => setIsLoading(false));
+      fetch(`/api/data/ticket-details/${ticketId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch ticket details');
+        return res.json();
+      })
+      .then(data => {
+        if (data.ticket) {
+          setTicket(data.ticket);
+        } else {
+          toast({ title: 'Error', description: 'Ticket not found or access denied.', variant: 'destructive' });
+          router.push('/support');
+        }
+      })
+      .catch(error => {
+        console.error("Failed to fetch ticket", error);
+        toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
+      })
+      .finally(() => setIsLoading(false));
     }
-  }, [user?.id, ticketId, toast, router]);
+  }, [user?.id, ticketId, token, toast, router]);
 
   const handleReplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,18 +70,26 @@ export default function ViewTicketPage() {
 
     setIsReplying(true);
     try {
-      const response = await replyToTicketAPI(user.id, ticket.id, replyMessage);
-      if (response.result === 'success' && response.reply) {
+      const response = await fetch(`/api/data/ticket-replies/${ticket.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ message: replyMessage, userId: user.id }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to send reply.');
+      }
+
+      if (data.reply) {
         setTicket(prevTicket => prevTicket ? {
           ...prevTicket,
-          replies: [...(prevTicket.replies || []), response.reply!],
+          replies: [...(prevTicket.replies || []), data.reply!],
           status: 'Customer-Reply',
-          lastUpdated: response.reply!.date,
+          lastUpdated: data.reply!.date,
         } : null);
         setReplyMessage('');
         toast({ title: 'Reply Sent', description: 'Your reply has been added to the ticket.' });
-      } else {
-        throw new Error(response.message || 'Failed to send reply.');
       }
     } catch (error) {
       toast({ title: 'Error Sending Reply', description: (error as Error).message, variant: 'destructive' });
@@ -92,8 +106,8 @@ export default function ViewTicketPage() {
     return (
       <div className="space-y-4">
          <div className="flex items-center gap-4">
-          <Skeleton className="h-10 w-10 rounded-md" />
-          <Skeleton className="h-8 w-1/2" />
+          <div className="h-10 w-10 bg-muted rounded-md animate-pulse"></div>
+          <div className="h-8 w-1/2 bg-muted rounded animate-pulse"></div>
         </div>
         <Card>
           <CardContent className="p-6">
@@ -183,13 +197,15 @@ export default function ViewTicketPage() {
         </Card>
       )}
        {ticket.status === 'Closed' && (
-         <Alert className="shadow-md">
-            <MessageSquare className="h-4 w-4"/>
-            <AlertTitle>This ticket is closed.</AlertTitle>
-            <AlertDescription>
+         <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
+            <div className="flex items-center">
+              <MessageSquare className="h-4 w-4 mr-2"/>
+              <h3 className="font-semibold">This ticket is closed.</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
               If your issue persists or you have a new question, please <Link href="/support/new" className="underline hover:text-primary">open a new ticket</Link>.
-            </AlertDescription>
-          </Alert>
+            </p>
+          </div>
        )}
     </div>
   );

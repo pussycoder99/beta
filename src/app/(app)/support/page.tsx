@@ -1,9 +1,9 @@
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { Ticket } from '@/types';
-import { getTicketsAPI } from '@/lib/whmcs-mock-api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,23 +36,40 @@ const PriorityBadge = ({ priority }: { priority: Ticket['priority'] }) => {
 
 
 export default function SupportPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && token) {
       setIsLoading(true);
-      getTicketsAPI(user.id)
-        .then(data => setTickets(data.tickets))
-        .catch(error => {
-          console.error("Failed to fetch tickets", error);
-          toast({ title: 'Error', description: 'Could not load support tickets.', variant: 'destructive' });
-        })
-        .finally(() => setIsLoading(false));
+      fetch('/api/data/tickets', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(err => { throw new Error(err.message || 'Failed to fetch tickets'); });
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.tickets) {
+          setTickets(data.tickets);
+        } else {
+          setTickets([]);
+          toast({ title: "Notice", description: "No tickets found or data format is unexpected."});
+        }
+      })
+      .catch(error => {
+        console.error("Failed to fetch tickets", error);
+        toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
+      })
+      .finally(() => setIsLoading(false));
     }
-  }, [user?.id, toast]);
+  }, [user?.id, token, toast]);
 
   if (isLoading) {
      return (

@@ -9,9 +9,10 @@ const WHMCS_API_SECRET = process.env.WHMCS_API_SECRET;
 
 export async function callWhmcsApi(action: string, params: Record<string, any> = {}): Promise<any> {
   if (!WHMCS_API_URL || !WHMCS_API_IDENTIFIER || !WHMCS_API_SECRET) {
-    const errorMessage = "WHMCS API credentials or URL are not configured server-side. Ensure WHMCS_API_IDENTIFIER, WHMCS_API_SECRET, and NEXT_PUBLIC_WHMCS_API_URL are set.";
+    const errorMessage = "WHMCS API credentials or URL are not configured server-side. Ensure WHMCS_API_IDENTIFIER, WHMCS_API_SECRET, and NEXT_PUBLIC_WHMCS_API_URL are set in your .env.local file.";
     console.error(`[WHMCS API SERVER ERROR] ${errorMessage}`);
-    throw new Error(errorMessage);
+    // Return a result: error object instead of throwing, so the UI can handle it gracefully.
+    return { result: 'error', message: errorMessage };
   }
 
   const formData = new URLSearchParams();
@@ -24,8 +25,7 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
     formData.append(key, params[key]);
   }
 
-  console.log(`[WHMCS API SERVER DEBUG] Calling action (via callWhmcsApi): ${action} with params:`, JSON.stringify(params));
-
+  // console.log(`[WHMCS API SERVER DEBUG] Calling action (via callWhmcsApi): ${action} with params:`, JSON.stringify(params));
 
   try {
     const response = await fetch(WHMCS_API_URL, {
@@ -56,7 +56,8 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
 
     if (data.result === 'error' && action !== 'ValidateLogin') {
       console.error(`[WHMCS API SERVER ERROR] WHMCS API Error for action ${action}:`, data.message);
-      throw new Error(data.message || `WHMCS API error for action ${action}.`);
+      // For ValidateLogin, we let the specific function handle the error message.
+      return { result: 'error', message: data.message || `WHMCS API error for action ${action}.` };
     }
     return data;
   } catch (error: any) {
@@ -69,52 +70,14 @@ export async function callWhmcsApi(action: string, params: Record<string, any> =
 }
 
 export const validateLoginWHMCS = async (email: string, passwordAttempt: string): Promise<{ result: 'success' | 'error'; message?: string; userid?: string, passwordhash?: string, twoFactorEnabled?: boolean }> => {
-  const directFormData = new URLSearchParams();
-  directFormData.append('action', 'ValidateLogin');
-  directFormData.append('username', WHMCS_API_IDENTIFIER!);
-  directFormData.append('password', WHMCS_API_SECRET!);
-  directFormData.append('email', email);
-  directFormData.append('password2', passwordAttempt);
-  directFormData.append('responsetype', 'json');
-
-
-  console.log(`[WHMCS API SERVER DEBUG] Attempting ValidateLogin action (direct)`);
-  console.log(`[WHMCS API SERVER DEBUG] Target URL: ${WHMCS_API_URL}`);
-  console.log(`[WHMCS API SERVER DEBUG] ValidateLogin FormData to be sent:`);
-  for (const [key, value] of directFormData.entries()) {
-    if (key.toLowerCase().includes('password') || key.toLowerCase().includes('secret') || key.toLowerCase() === 'password2') {
-      console.log(`  ${key}: ********`);
-    } else {
-      console.log(`  ${key}: ${value}`);
-    }
-  }
-
   try {
-    const response = await fetch(WHMCS_API_URL!, {
-        method: 'POST',
-        body: directFormData,
-        cache: 'no-store',
+    const data = await callWhmcsApi('ValidateLogin', {
+      email: email,
+      password2: passwordAttempt,
     });
 
-    const rawResponseText = await response.text();
-    console.log(`[WHMCS API SERVER DEBUG] Raw Response Text for ValidateLogin (direct):`, rawResponseText);
-
-    if (!response.ok) {
-        const errorText = rawResponseText || `WHMCS ValidateLogin request failed with status ${response.status}`;
-        console.error(`[WHMCS API SERVER ERROR] ValidateLogin request failed: ${errorText}`);
-        try {
-            const errorJson = JSON.parse(errorText);
-            if (errorJson && errorJson.message) {
-              return { result: 'error', message: errorJson.message };
-            }
-          } catch (parseErr) {
-            // Not a JSON error
-          }
-        return { result: 'error', message: errorText };
-    }
-    const data = JSON.parse(rawResponseText);
-    console.log(`[WHMCS API SERVER DEBUG] Parsed Response Data for ValidateLogin (direct):`, data);
-
+    // The 'ValidateLogin' action returns result:error for failed logins, which is expected behavior.
+    // We check for success specifically.
     if (data.result === 'success' && data.userid) {
       return {
         result: 'success',
@@ -123,6 +86,7 @@ export const validateLoginWHMCS = async (email: string, passwordAttempt: string)
         twoFactorEnabled: data.twoFactorEnabled === "true" || data.twoFactorEnabled === true
       };
     }
+    // If not success, return the error message from the API.
     return { result: 'error', message: data.message || 'Authentication failed: Unknown reason from WHMCS.' };
   } catch (error: any) {
     console.error("[WHMCS API SERVER CATCH ERROR] ValidateLogin API error:", error.message);
@@ -493,7 +457,7 @@ export const addFundsWHMCS = async (
 
 
 export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[], whmcsData?: any, source?: string, allProducts?: Product[] }> => {
-  console.log('[WHMCS API SERVER INFO - getProductGroupsWHMCS] Attempting GetProductGroups.');
+  // console.log('[WHMCS API SERVER INFO - getProductGroupsWHMCS] Attempting GetProductGroups.');
   try {
     const data = await callWhmcsApi('GetProductGroups', {});
     let groups: ProductGroup[] = [];
@@ -507,10 +471,10 @@ export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[],
           tagline: g.tagline,
           order: parseInt(g.order, 10) || 0,
         })).sort((a, b) => (a.order || 0) - (b.order || 0));
-        console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful. Found ${groups.length} groups. Parsed groups:`, JSON.stringify(groups.map(g => ({id: g.id, name: g.name}))));
+        // console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful. Found ${groups.length} groups.`);
         return { groups, whmcsData: data, source: 'GetProductGroups' };
       } else {
-         console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful, but data.groups or data.groups.group is missing/empty. Raw data:`, JSON.stringify(data));
+         // console.log(`[WHMCS API SERVER INFO - getProductGroupsWHMCS] GetProductGroups successful, but data.groups or data.groups.group is missing/empty. Raw data:`, JSON.stringify(data));
          return { groups: [], whmcsData: data, source: 'GetProductGroups_NoGroupData' };
       }
     } else {
@@ -595,7 +559,7 @@ export const getProductsWHMCS = async (gid?: string): Promise<{ products: Produc
     if (gid) {
       params.gid = gid;
     } else {
-      console.log("[WHMCS API SERVER INFO - getProductsWHMCS] Fetching ALL products (no GID specified). Expecting 'groupname' in response for each product.");
+      // console.log("[WHMCS API SERVER INFO - getProductsWHMCS] Fetching ALL products (no GID specified). Expecting 'groupname' in response for each product.");
     }
     const data = await callWhmcsApi('GetProducts', params);
     let products: Product[] = [];
@@ -629,13 +593,13 @@ export const getProductsWHMCS = async (gid?: string): Promise<{ products: Produc
           quantity_available: p.quantity_available
         };
       });
-      if (!gid) {
-        console.log(`[WHMCS API SERVER INFO - getProductsWHMCS] Successfully fetched ${products.length} products (all). First few products raw:`, JSON.stringify(productsArray.slice(0,1)));
-      }
+      // if (!gid) {
+      //   console.log(`[WHMCS API SERVER INFO - getProductsWHMCS] Successfully fetched ${products.length} products (all). First few products raw:`, JSON.stringify(productsArray.slice(0,1)));
+      // }
     } else if (data.result !== 'success') {
       console.warn(`[WHMCS API SERVER WARN - getProductsWHMCS] GetProducts API call ${gid ? `for GID ${gid}` : '(all products)'} failed. Data:`, data);
     } else {
-      console.log(`[WHMCS API SERVER INFO - getProductsWHMCS] No products found ${gid ? `for GID ${gid}` : '(all products)'}. Data:`, data);
+      // console.log(`[WHMCS API SERVER INFO - getProductsWHMCS] No products found ${gid ? `for GID ${gid}` : '(all products)'}. Data:`, data);
     }
     return { products, whmcsData: data };
   } catch (error) {
@@ -643,70 +607,3 @@ export const getProductsWHMCS = async (gid?: string): Promise<{ products: Produc
     return { products: [] };
   }
 };
-
-
-// --- Functions below are legacy and mainly for pages that might still directly import them ---
-// --- These should be refactored to use the Next.js API routes for secure credential handling ---
-
-export const getInvoicesAPI = async (userId: string, token?: string) => {
-  if (!token) throw new Error("Auth token required for getInvoicesAPI");
-  const response = await fetch('/api/data/invoices', { headers: { 'Authorization': `Bearer ${token}` }});
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.message || 'Failed to fetch invoices');
-  }
-  return response.json();
-};
-
-export const getTicketsAPI = async (userId: string, token?: string) => {
-  if (!token) throw new Error("Auth token required for getTicketsAPI");
-  const response = await fetch('/api/data/tickets', { headers: { 'Authorization': `Bearer ${token}` }});
-   if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.message || 'Failed to fetch tickets');
-  }
-  return response.json();
-};
-
-export const getTicketByIdAPI = async (ticketId: string, token?: string) => {
-  if (!token) throw new Error("Auth token required for getTicketByIdAPI");
-   const response = await fetch(`/api/data/ticket-details/${ticketId}`, { headers: { 'Authorization': `Bearer ${token}` }});
-   if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.message || 'Failed to fetch ticket details');
-  }
-  return response.json();
-};
-
-
-export const replyToTicketAPI = async (userId: string, ticketId: string, message: string, token?: string) => {
-  if (!token) throw new Error("Auth token required for replyToTicketAPI");
-   const response = await fetch(`/api/data/ticket-replies/${ticketId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ message, userId }),
-  });
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.message || 'Failed to reply to ticket');
-  }
-  return response.json();
-};
-
-export const openTicketAPI = async (userId: string, ticketDetails: {subject: string, department: string, message: string, priority: 'Low' | 'Medium' | 'High'}, token?: string) => {
-  if (!token) throw new Error("Auth token required for openTicketAPI");
-  const response = await fetch('/api/data/tickets', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ ...ticketDetails, userId }),
-  });
-   if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.message || 'Failed to open ticket');
-  }
-  return response.json();
-};
-
-
-
-    
