@@ -1,7 +1,8 @@
 
 
 
-import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail, DomainSearchResult, DomainConfiguration } from '@/types';
+
+import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail, DomainSearchResult, DomainConfiguration, PaymentMethod } from '@/types';
 import { format } from 'date-fns';
 
 const WHMCS_API_URL = process.env.NEXT_PUBLIC_WHMCS_API_URL;
@@ -683,5 +684,25 @@ export const addDomainOrderWHMCS = async (
     }
   } catch (error: any) {
     return { result: 'error', message: (error instanceof Error ? error.message : String(error)) };
+  }
+};
+
+export const getPaymentMethodsWHMCS = async (): Promise<{ paymentMethods: PaymentMethod[], whmcsData?: any }> => {
+  try {
+    const data = await callWhmcsApi('GetPaymentMethods');
+    let paymentMethods: PaymentMethod[] = [];
+    if (data.result === 'success' && data.paymentmethods?.paymentmethod) {
+      const methodsArray = Array.isArray(data.paymentmethods.paymentmethod) ? data.paymentmethods.paymentmethod : [data.paymentmethods.paymentmethod];
+      paymentMethods = methodsArray.map((m: any) => ({
+        module: m.module,
+        displayName: m.displayname,
+      }));
+    } else if (data.result !== 'success') {
+      console.warn(`[WHMCS API SERVER WARN] GetPaymentMethods API call failed. Data:`, data);
+    }
+    return { paymentMethods, whmcsData: data };
+  } catch (error) {
+    console.error("[WHMCS API SERVER CATCH ERROR] Failed to fetch payment methods:", error);
+    return { paymentMethods: [] };
   }
 };

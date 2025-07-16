@@ -1,5 +1,6 @@
 
 
+
 export interface User {
   id: string;
   email: string;
@@ -164,4 +165,8 @@ export interface DomainConfiguration {
     };
 }
 
+export interface PaymentMethod {
+  module: string;
+  displayName: string;
+}
     
