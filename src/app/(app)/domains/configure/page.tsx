@@ -9,11 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowLeft, ShoppingCart, ShieldCheck, Database, Forward, Loader2 } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, ShieldCheck, Database, Forward, Loader2, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import type { DomainConfiguration } from '@/types';
+import type { DomainConfiguration, PaymentMethod } from '@/types';
 
 // Mock pricing, in a real scenario this would come from the API
 const PRICING = {
@@ -39,6 +39,35 @@ function ConfigureDomainContent() {
     
     const [isProcessing, setIsProcessing] = useState(false);
     const [total, setTotal] = useState(0);
+    const [paymentMethod, setPaymentMethod] = useState('');
+    const [availableMethods, setAvailableMethods] = useState<PaymentMethod[]>([]);
+    const [isLoadingMethods, setIsLoadingMethods] = useState(true);
+
+    useEffect(() => {
+        if (token) {
+          setIsLoadingMethods(true);
+          fetch('/api/billing/payment-methods', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.paymentMethods) {
+              setAvailableMethods(data.paymentMethods);
+              // Set default payment method if available
+              if (data.paymentMethods.length > 0) {
+                setPaymentMethod(data.paymentMethods[0].module);
+              }
+            } else {
+              toast({ title: 'Error', description: 'Could not load payment methods.', variant: 'destructive' });
+            }
+          })
+          .catch(err => {
+            toast({ title: 'Error', description: 'Failed to fetch payment methods.', variant: 'destructive' });
+            console.error(err);
+          })
+          .finally(() => setIsLoadingMethods(false));
+        }
+      }, [token, toast]);
 
     useEffect(() => {
         if (domainName) {
@@ -71,12 +100,16 @@ function ConfigureDomainContent() {
             toast({ title: 'Not Authenticated', description: 'You must be logged in to place an order.', variant: 'destructive' });
             return;
         }
+         if (!paymentMethod) {
+            toast({ title: 'Payment Method Required', description: 'Please select a payment method.', variant: 'destructive' });
+            return;
+        }
         setIsProcessing(true);
         try {
             const response = await fetch('/api/domains/order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(config),
+                body: JSON.stringify({ ...config, paymentMethod }),
             });
             const data = await response.json();
             if (!response.ok) {
@@ -217,7 +250,7 @@ function ConfigureDomainContent() {
                             <CardHeader>
                                 <CardTitle>Order Summary</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-2 text-sm">
+                            <CardContent className="space-y-4 text-sm">
                                 <div className="flex justify-between">
                                     <span>Domain Registration ({config.registrationPeriod} Year/s)</span>
                                     <span className="font-medium">${(PRICING.register * config.registrationPeriod).toFixed(2)}</span>
@@ -228,13 +261,32 @@ function ConfigureDomainContent() {
                                         <span className="font-medium">${PRICING.idProtection.toFixed(2)}</span>
                                     </div>
                                 )}
-                                <div className="flex justify-between font-bold text-lg pt-2 border-t mt-2">
+                                <div className="space-y-2 pt-2 border-t mt-2">
+                                    <Label htmlFor="paymentMethod" className="font-semibold">Payment Method</Label>
+                                    <Select value={paymentMethod} onValueChange={setPaymentMethod} required disabled={isLoadingMethods}>
+                                        <SelectTrigger id="paymentMethod">
+                                        <SelectValue placeholder={isLoadingMethods ? "Loading..." : "Select a method"} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                        {availableMethods.map(method => (
+                                            <SelectItem key={method.module} value={method.module}>
+                                                {method.displayName}
+                                            </SelectItem>
+                                        ))}
+                                        {(!isLoadingMethods && availableMethods.length === 0) &&
+                                            <SelectItem value="no-methods" disabled>No methods available</SelectItem>
+                                        }
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="flex justify-between font-bold text-lg pt-4 border-t mt-4">
                                     <span>Total Due Today</span>
                                     <span>${total.toFixed(2)}</span>
                                 </div>
                             </CardContent>
                             <CardFooter>
-                                <Button type="submit" className="w-full" disabled={isProcessing}>
+                                <Button type="submit" className="w-full" disabled={isProcessing || isLoadingMethods}>
                                     {isProcessing ? <Loader2 className="animate-spin" /> : <ShoppingCart className="mr-2 h-4 w-4" />}
                                     Continue to Checkout
                                 </Button>

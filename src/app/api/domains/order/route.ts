@@ -11,16 +11,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Unauthorized: Invalid or missing token.' }, { status: 401 });
     }
 
-    const config: DomainConfiguration = await request.json();
+    const config: DomainConfiguration & { paymentMethod: string } = await request.json();
 
     if (!config.domainName || !config.registrationPeriod) {
       return NextResponse.json({ message: 'Domain name and registration period are required.' }, { status: 400 });
     }
 
-    // Default payment method, can be made dynamic later
-    const paymentMethod = 'paypal'; 
+    if (!config.paymentMethod) {
+        return NextResponse.json({ message: 'Payment method is required.' }, { status: 400 });
+    }
 
-    const result = await addDomainOrderWHMCS(userId, config, paymentMethod);
+    const result = await addDomainOrderWHMCS(userId, config, config.paymentMethod);
 
     if (result.result === 'success' && result.orderid && result.invoiceid) {
         const whmcsAppUrl = process.env.NEXT_PUBLIC_WHMCS_APP_URL || 'https://portal.snbdhost.com';
