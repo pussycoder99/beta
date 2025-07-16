@@ -9,7 +9,7 @@ export const SnbdLogo = (props: SVGProps<SVGSVGElement>) => (
       y="35" 
       fontFamily="Inter, sans-serif" 
       fontSize="30" 
-      fontWeight="bold" 
+      fontWeight="800"
       fill="hsl(var(--primary))"
     >
       SNBD
@@ -19,10 +19,10 @@ export const SnbdLogo = (props: SVGProps<SVGSVGElement>) => (
       y="35" 
       fontFamily="Inter, sans-serif" 
       fontSize="30" 
-      fontWeight="normal" 
+      fontWeight="500"
       fill="hsl(var(--foreground))"
     >
-      Host
+      HOST
     </text>
   </svg>
 );

@@ -9,7 +9,7 @@ export default function RegisterPage() {
   return (
     <>
       <h1 className="text-2xl font-bold text-center mb-2 text-foreground">Create your Account</h1>
-      <p className="text-sm text-muted-foreground text-center mb-6">Join SNBD Host and manage your services with ease.</p>
+      <p className="text-sm text-muted-foreground text-center mb-6">Join us and manage your services with ease.</p>
       <RegisterForm />
     </>
   );

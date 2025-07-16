@@ -4,33 +4,33 @@
 
 @layer base {
   :root {
-    --background: 0 0% 13.3%; /* #222222 Dark Gray */
-    --foreground: 0 0% 86.7%; /* #DDDDDD Light Gray */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 0% 16%; /* Slightly Lighter Dark Gray */
-    --card-foreground: 0 0% 86.7%; /* Light Gray */
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 10%; /* Even Darker Gray */
-    --popover-foreground: 0 0% 86.7%; /* Light Gray */
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 3 100% 61.4%; /* #FF4136 SNBD HOST Red */
-    --primary-foreground: 0 0% 100%; /* White */
+    --primary: 3 100% 61.4%; /* SNBD HOST Red */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 20%; /* Medium Dark Gray */
-    --secondary-foreground: 0 0% 90%; /* Off-White */
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 0 0% 20%; /* Medium Dark Gray */
-    --muted-foreground: 0 0% 55%; /* Medium Gray */
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
 
-    --accent: 0 0% 25%; /* Light Dark Gray */
-    --accent-foreground: 0 0% 95%; /* Very Light Gray */
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 84.2% 60.2%; /* Default Red */
-    --destructive-foreground: 0 0% 98%; /* Off-White */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 25%; /* Light Dark Gray */
-    --input: 0 0% 25%; /* Light Dark Gray */
-    --ring: 3 100% 61.4%; /* #FF4136 SNBD HOST Red for focus */
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 3 100% 61.4%; /* SNBD HOST Red for focus */
 
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -40,46 +40,56 @@
 
     --radius: 0.5rem;
 
-    /* Sidebar specific variables for the dark theme */
-    --sidebar-background: 0 0% 10%; /* #1A1A1A - even darker for sidebar */
-    --sidebar-foreground: 0 0% 80%; /* Lighter gray for sidebar text */
-    --sidebar-primary: 3 100% 61.4%; /* SNBD Red for active/hover states */
-    --sidebar-primary-foreground: 0 0% 100%; /* White text on primary */
-    --sidebar-accent: 0 0% 15%; /* Slightly lighter than sidebar bg for hover */
-    --sidebar-accent-foreground: 0 0% 90%; /* Text color on sidebar accent */
-    --sidebar-border: 0 0% 20%; /* Border color within sidebar */
-    --sidebar-ring: 3 100% 61.4%; /* SNBD Red for focus rings in sidebar */
-  }
-
-  /* The .dark class variables are kept for compatibility if needed, but root is now dark by default */
-  .dark {
-    --background: 0 0% 13.3%;
-    --foreground: 0 0% 86.7%;
-    --card: 0 0% 16%;
-    --card-foreground: 0 0% 86.7%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 86.7%;
-    --primary: 3 100% 61.4%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 20%;
-    --secondary-foreground: 0 0% 90%;
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 55%;
-    --accent: 0 0% 25%;
-    --accent-foreground: 0 0% 95%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 25%;
-    --input: 0 0% 25%;
-    --ring: 3 100% 61.4%;
-
-    --sidebar-background: 0 0% 10%;
-    --sidebar-foreground: 0 0% 80%;
+    /* Sidebar specific variables */
+    --sidebar-background: 240 10% 3.9%;
+    --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 3 100% 61.4%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 0 0% 90%;
-    --sidebar-border: 0 0% 20%;
+    --sidebar-accent: 240 4.8% 11%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 3 100% 61.4%;
+  }
+
+  .dark {
+    /* Keep dark theme variables for the authenticated area */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 3 100% 61.4%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 3 100% 61.4%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 240 10% 3.9%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 3 100% 61.4%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 4.8% 11%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 3 100% 61.4%;
   }
 }
@@ -92,5 +102,36 @@
     @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom styles for the public landing page to use a light theme */
+  .public-light {
+    --background: 0 0% 100%; /* white */
+    --foreground: 240 10% 3.9%; /* dark gray */
+    
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    
+    --primary: 3 84% 56%; /* SNBD Red */
+    --primary-foreground: 0 0% 100%; /* white */
+    
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 240 10% 3.9%;
+    
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 240 3.8% 46.1%;
+    
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 240 10% 3.9%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 0 0% 92%;
+    --input: 0 0% 92%;
+    --ring: 3 84% 56%;
   }
 }
