@@ -18,7 +18,11 @@ const ProductInfoSchema = z.object({
 });
 
 const HostingRecommenderInputSchema = z.object({
-  projectDescription: z.string().describe("The user's description of their website or project needs."),
+  projectType: z.string().describe("The type of website the user is building (e.g., 'E-commerce', 'Blog', 'Portfolio')."),
+  skillLevel: z.string().describe("The user's self-assessed technical skill level (e.g., 'Beginner', 'Intermediate', 'Expert')."),
+  trafficEstimate: z.string().describe("The user's estimated monthly traffic (e.g., 'Low', 'Medium', 'High')."),
+  mainPriority: z.string().describe("What the user considers the most important factor (e.g., 'Speed', 'Price', 'Security', 'Ease of Use')."),
+  projectDescription: z.string().describe("The user's open-ended description of their website or project needs."),
   availableProducts: z.array(ProductInfoSchema).describe("A list of available hosting products."),
 });
 export type HostingRecommenderInput = z.infer<typeof HostingRecommenderInputSchema>;
@@ -39,10 +43,14 @@ const prompt = ai.definePrompt({
   output: { schema: HostingRecommenderOutputSchema },
   prompt: `You are an expert hosting advisor for a web hosting company. Your goal is to help a potential customer choose the best hosting plan for their needs.
 
-Analyze the user's project description and the list of available products with their names and descriptions.
+Analyze the user's answers to the questions and the list of available products.
 
-**User's Project Description:**
-"{{{projectDescription}}}"
+**User's Answers:**
+- Project Type: {{projectType}}
+- Technical Skill Level: {{skillLevel}}
+- Estimated Traffic: {{trafficEstimate}}
+- Main Priority: {{mainPriority}}
+- Project Description: "{{projectDescription}}"
 
 **Available Hosting Products:**
 {{#each availableProducts}}
@@ -55,11 +63,11 @@ Description:
 {{/each}}
 
 **Your Task:**
-1.  Read the user's description carefully to understand their needs (e.g., e-commerce, portfolio, blog, traffic expectations, technical skill).
-2.  Review all available products. Match the user's needs to the product that is the best fit. Consider keywords like "startup", "business", "e-commerce", "high traffic", "WordPress", etc., in the product names and descriptions.
+1.  Read the user's answers carefully to understand their needs (e.g., e-commerce needs more resources, a beginner needs an easy-to-use plan, high traffic needs a powerful plan).
+2.  Review all available products. Match the user's needs to the product that is the best fit.
 3.  Select exactly one product to recommend.
 4.  Provide the chosen product's ID in the 'recommendedProductId' field.
-5.  Write a friendly, single-paragraph justification for your choice. Explain in simple terms *why* that specific plan is a good match for their project. For example: "Based on your plan to launch an e-commerce store, our 'Business Hosting' plan is the perfect fit. It offers the extra resources and security you'll need to handle transactions and a growing number of visitors."
+5.  Write a friendly, single-paragraph justification for your choice. Explain in simple terms *why* that specific plan is a good match for their project based on their answers. For example: "Based on your plan to launch an e-commerce store with high traffic, our 'Business Hosting' plan is the perfect fit. It offers the extra resources and security you'll need to handle transactions and a growing number of visitors, and it's robust enough for your expert skill level."
 
 Provide your response in the requested JSON format.`,
 });
