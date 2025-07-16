@@ -84,8 +84,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-background">
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
+    <div className="flex min-h-screen w-full flex-col bg-gray-50">
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-4 md:px-6">
           <Link href="/dashboard" className="mr-6 flex items-center gap-2">
             <Image 
                 src="https://snbdhost.com/wp-content/uploads/2025/05/Untitled-design-6.png" 
