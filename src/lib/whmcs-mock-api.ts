@@ -1,4 +1,5 @@
 
+
 import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail } from '@/types';
 import { format } from 'date-fns';
 
@@ -706,3 +707,6 @@ export const openTicketAPI = async (userId: string, ticketDetails: {subject: str
   return response.json();
 };
 
+
+
+    
