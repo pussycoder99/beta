@@ -2,351 +2,206 @@
 import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail, DomainSearchResult, DomainConfiguration, PaymentMethod } from '@/types';
 import { format, subDays, addDays, addMonths } from 'date-fns';
 
-// This function will be the single point of contact for all real WHMCS API calls.
-export async function callWhmcsApi(action: string, params: Record<string, any> = {}): Promise<any> {
-    const apiUrl = process.env.NEXT_PUBLIC_WHMCS_API_URL;
-    const apiIdentifier = process.env.WHMCS_API_IDENTIFIER;
-    const apiSecret = process.env.WHMCS_API_SECRET;
+// --- MOCK DATA SETUP ---
+// This file is currently configured to return mock data for local development.
+// This allows UI/UX development without needing a live WHMCS connection.
+// To switch to a live API, replace the functions below with calls to a real WHMCS API endpoint.
 
-    if (!apiUrl || !apiIdentifier || !apiSecret) {
-        console.error("WHMCS API credentials are not configured in environment variables.");
-        throw new Error("API credentials are not configured on the server.");
-    }
-    
-    const headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-    };
-
-    const body = new URLSearchParams({
-        action,
-        identifier: apiIdentifier,
-        secret: apiSecret,
-        responsetype: 'json',
-        ...params,
-    });
-
-    try {
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers,
-            body,
-            cache: 'no-store', // Ensure fresh data is fetched every time
-        });
-
-        if (!response.ok) {
-            // Attempt to get more detailed error from response body
-            const errorBody = await response.text();
-            console.error(`WHMCS API Error (${response.status}):`, errorBody);
-            throw new Error(`API request failed with status ${response.status}.`);
-        }
-        
-        const data = await response.json();
-        
-        // WHMCS often returns result="error" in a 200 OK response
-        if (data.result === 'error') {
-            console.error(`WHMCS API Logic Error for action "${action}":`, data.message || 'No error message provided.');
-            throw new Error(data.message || `An error occurred with the API for action: ${action}.`);
-        }
-
-        return data;
-
-    } catch (error) {
-        console.error(`Failed to execute WHMCS API action "${action}":`, error);
-        // Re-throw the error so the calling function can handle it
-        throw error;
-    }
-}
-
-
-// --- API-CONNECTED FUNCTIONS ---
-// These functions now use the live callWhmcsApi helper.
-
-export const validateLoginWHMCS = async (email: string, passwordAttempt: string): Promise<{ result: 'success' | 'error'; message?: string; userid?: string }> => {
-  return callWhmcsApi('ValidateLogin', { email, password2: passwordAttempt });
+const MOCK_USERS: { [key: string]: User & { passwordHash: string } } = {
+  '1': {
+    id: '1',
+    email: 'test.user@example.com',
+    passwordHash: 'hashed_password123', // In a real app, never store plain text passwords
+    firstName: 'John',
+    lastName: 'Doe',
+    companyName: 'Doe Industries',
+    address1: '123 Mockingbird Lane',
+    city: 'Anytown',
+    state: 'Anystate',
+    postcode: '12345',
+    country: 'US',
+    phoneNumber: '555-123-4567',
+  },
 };
 
-export const addClientWHMCS = async (clientData: Omit<User, 'id'> & {password?: string}): Promise<{ result: 'success' | 'error'; message?: string; userId?: string }> => {
-    const params = {
-        firstname: clientData.firstName,
-        lastname: clientData.lastName,
-        email: clientData.email,
-        address1: clientData.address1,
-        city: clientData.city,
-        state: clientData.state,
-        postcode: clientData.postcode,
-        country: clientData.country,
-        phonenumber: clientData.phoneNumber,
-        companyname: clientData.companyName,
-        password2: clientData.password,
-    };
-    const response = await callWhmcsApi('AddClient', params);
-    return {
-        result: response.result,
-        message: response.message,
-        userId: response.clientid
-    };
+const MOCK_SERVICES: Service[] = [
+  { id: '101', name: 'Premium Web Hosting', status: 'Active', registrationDate: format(subDays(new Date(), 90), 'yyyy-MM-dd'), nextDueDate: format(addDays(new Date(), 20), 'yyyy-MM-dd'), billingCycle: 'Monthly', amount: '$15.00 USD', domain: 'mycoolwebsite.com', diskusage: '5120', disklimit: '20480', bwusage: '15360', bwlimit: '102400', lastupdate: format(new Date(), 'yyyy-MM-dd HH:mm:ss') },
+  { id: '102', name: 'Basic VPS', status: 'Suspended', registrationDate: format(subDays(new Date(), 180), 'yyyy-MM-dd'), nextDueDate: format(subDays(new Date(), 10), 'yyyy-MM-dd'), billingCycle: 'Quarterly', amount: '$45.00 USD', domain: 'dev.mycoolwebsite.com', diskusage: '10240', disklimit: '51200', bwusage: '81920', bwlimit: '1048576', lastupdate: format(new Date(), 'yyyy-MM-dd HH:mm:ss') },
+  { id: '103', name: 'Domain Registration', status: 'Active', registrationDate: format(subDays(new Date(), 365), 'yyyy-MM-dd'), nextDueDate: format(addDays(new Date(), 30), 'yyyy-MM-dd'), billingCycle: 'Annually', amount: '$12.99 USD', domain: 'anotherdomain.net' },
+  { id: '104', name: 'Business Email Hosting', status: 'Terminated', registrationDate: format(subDays(new Date(), 700), 'yyyy-MM-dd'), nextDueDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), billingCycle: 'Monthly', amount: '$5.00 USD', domain: 'contact@anotherdomain.net' },
+];
+
+const MOCK_DOMAINS: Domain[] = [
+    { id: '201', domainName: 'mycoolwebsite.com', status: 'Active', registrationDate: format(subDays(new Date(), 400), 'yyyy-MM-dd'), expiryDate: format(addDays(new Date(), 300), 'yyyy-MM-dd'), registrar: 'Enom', nameservers: ['ns1.snbdhost.com', 'ns2.snbdhost.com'] },
+    { id: '202', domainName: 'anotherdomain.net', status: 'Expired', registrationDate: format(subDays(new Date(), 800), 'yyyy-MM-dd'), expiryDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), registrar: 'Namecheap', nameservers: ['dns1.namecheap.com', 'dns2.namecheap.com'] },
+    { id: '203', domainName: 'newproject.dev', status: 'Pending', registrationDate: format(new Date(), 'yyyy-MM-dd'), expiryDate: format(addDays(new Date(), 365), 'yyyy-MM-dd'), registrar: 'GoDaddy', nameservers: [] },
+];
+
+const MOCK_INVOICES: Invoice[] = [
+    { id: '301', invoiceNumber: 'INV-001', dateCreated: format(subDays(new Date(), 45), 'yyyy-MM-dd'), dueDate: format(subDays(new Date(), 15), 'yyyy-MM-dd'), total: '$15.00 USD', status: 'Paid', items: [{description: 'Premium Web Hosting', amount: '$15.00'}] },
+    { id: '302', invoiceNumber: 'INV-002', dateCreated: format(subDays(new Date(), 15), 'yyyy-MM-dd'), dueDate: format(addDays(new Date(), 15), 'yyyy-MM-dd'), total: '$60.00 USD', status: 'Unpaid', items: [{description: 'Basic VPS', amount: '$45.00'}, {description: 'Domain Renewal', amount: '$15.00'}] },
+    { id: '303', invoiceNumber: 'INV-003', dateCreated: format(subDays(new Date(), 75), 'yyyy-MM-dd'), dueDate: format(subDays(new Date(), 45), 'yyyy-MM-dd'), total: '$100.00 USD', status: 'Overdue', items: [{description: 'Dedicated Server Setup', amount: '$100.00'}] },
+    { id: '304', invoiceNumber: 'INV-004', dateCreated: format(subDays(new Date(), 100), 'yyyy-MM-dd'), dueDate: format(subDays(new Date(), 70), 'yyyy-MM-dd'), total: '$25.00 USD', status: 'Cancelled', items: [{description: 'SSL Certificate', amount: '$25.00'}] },
+];
+
+const MOCK_TICKETS: { [key: string]: Ticket } = {
+    '1': {
+        id: '1', ticketNumber: 'ABC-12345', subject: 'My website is slow', department: 'Technical Support', status: 'Answered', lastUpdated: format(subDays(new Date(), 1), 'yyyy-MM-dd HH:mm'), dateOpened: format(subDays(new Date(), 2), 'yyyy-MM-dd'), priority: 'Medium',
+        replies: [
+            { id: 'r1', author: 'Client', message: 'Hello, my website seems to be loading very slowly today. Can you please check?', date: format(subDays(new Date(), 2), 'yyyy-MM-dd HH:mm') },
+            { id: 'r2', author: 'Support Staff', message: 'Hi John, thank you for reaching out. We have checked your server and optimized your database. Please let us know if you see an improvement.', date: format(subDays(new Date(), 1), 'yyyy-MM-dd HH:mm') },
+        ]
+    },
+    '2': { id: '2', ticketNumber: 'DEF-67890', subject: 'Billing question', department: 'Billing', status: 'Closed', lastUpdated: format(subDays(new Date(), 10), 'yyyy-MM-dd HH:mm'), dateOpened: format(subDays(new Date(), 12), 'yyyy-MM-dd'), priority: 'Low', replies: [] },
+    '3': { id: '3', ticketNumber: 'GHI-11223', subject: 'New service inquiry', department: 'Sales', status: 'Customer-Reply', lastUpdated: format(new Date(), 'yyyy-MM-dd HH:mm'), dateOpened: format(new Date(), 'yyyy-MM-dd'), priority: 'High', replies: [] },
+};
+
+const MOCK_PRODUCT_GROUPS: ProductGroup[] = [
+    { id: '1', name: 'Shared Hosting' },
+    { id: '2', name: 'Reseller Hosting' },
+    { id: '3', name: 'VPS Servers' },
+];
+
+const MOCK_PRODUCTS: Product[] = [
+    { pid: '1', gid: '1', groupname: 'Shared Hosting', type: 'hostingaccount', name: 'Starter Plan', description: '<ul><li>10 GB SSD Storage</li><li>100 GB Bandwidth</li><li>5 Email Accounts</li><li>Free SSL</li></ul>', paytype: 'recurring', pricing: {} as ProductPricing, parsedPricingCycles: [{ cycleName: 'Monthly', displayPrice: '$5.00 USD', whmcsCycle: 'monthly' }] },
+    { pid: '2', gid: '1', groupname: 'Shared Hosting', type: 'hostingaccount', name: 'Business Plan', description: '<ul><li>50 GB SSD Storage</li><li>1 TB Bandwidth</li><li>Unlimited Emails</li><li>Free SSL &amp; Daily Backups</li></ul>', paytype: 'recurring', pricing: {} as ProductPricing, parsedPricingCycles: [{ cycleName: 'Annually', displayPrice: '$99.00 USD', whmcsCycle: 'annually' }] },
+    { pid: '3', gid: '2', groupname: 'Reseller Hosting', type: 'reselleraccount', name: 'Reseller Basic', description: '<p>Start your own hosting business!</p>', paytype: 'recurring', pricing: {} as ProductPricing, parsedPricingCycles: [{ cycleName: 'Monthly', displayPrice: '$25.00 USD', whmcsCycle: 'monthly' }] },
+];
+
+const MOCK_PAYMENT_METHODS: PaymentMethod[] = [
+    { module: 'paypal', displayName: 'PayPal' },
+    { module: 'stripe', displayName: 'Credit/Debit Card (Stripe)' },
+    { module: 'banktransfer', displayName: 'Bank Transfer' },
+];
+
+// --- MOCK API FUNCTIONS ---
+
+export const validateLoginWHMCS = async (email: string, passwordAttempt: string): Promise<{ result: 'success' | 'error'; message?: string; userid?: string }> => {
+  console.log(`[MOCK] Validating login for ${email}`);
+  if (email === 'test.user@example.com' && passwordAttempt === 'password123') {
+    return { result: 'success', userid: '1' };
+  }
+  return { result: 'error', message: 'Invalid credentials. Please try again.' };
+};
+
+export const addClientWHMCS = async (clientData: Omit<User, 'id'>): Promise<{ result: 'success' | 'error'; message?: string; userId?: string }> => {
+    console.log('[MOCK] Registering new client:', clientData.email);
+    const newId = (Object.keys(MOCK_USERS).length + 1).toString();
+    MOCK_USERS[newId] = { ...clientData, id: newId, passwordHash: "mock_hash" };
+    return { result: 'success', userId: newId };
 }
 
-
 export const getUserDetailsWHMCS = async (userId: string): Promise<{ user?: User }> => {
-  const data = await callWhmcsApi('GetClientsDetails', { clientid: userId });
-  if (data && data.client) {
-     const user: User = {
-        id: data.client.id.toString(),
-        email: data.client.email,
-        firstName: data.client.firstname,
-        lastName: data.client.lastname,
-        companyName: data.client.companyname,
-        address1: data.client.address1,
-        city: data.client.city,
-        state: data.client.state,
-        postcode: data.client.postcode,
-        country: data.client.countrycode, // Note: WHMCS returns country code
-        phoneNumber: data.client.phonenumber,
-     };
-     return { user };
-  }
-  return {};
+    console.log(`[MOCK] Getting user details for userId: ${userId}`);
+    if (MOCK_USERS[userId]) {
+        return { user: MOCK_USERS[userId] };
+    }
+    return {};
 };
 
 export const getClientsProductsWHMCS = async (userId: string, serviceId?: string): Promise<{ services: Service[] }> => {
-  const params: {clientid: string, serviceid?: string} = { clientid: userId };
-  if(serviceId) params.serviceid = serviceId;
-  const data = await callWhmcsApi('GetClientsProducts', params);
-
-  if (data && data.products && data.products.product) {
-      const services: Service[] = data.products.product.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        status: p.status,
-        registrationDate: p.regdate,
-        nextDueDate: p.nextduedate,
-        billingCycle: p.billingcycle,
-        amount: p.recurringamount,
-        domain: p.domain,
-        diskusage: p.diskusage,
-        disklimit: p.disklimit,
-        bwusage: p.bwusage,
-        bwlimit: p.bwlimit,
-        lastupdate: p.lastupdate,
-        username: p.username,
-        serverInfo: {
-            hostname: p.servername,
-            ipAddress: p.serverip
-        }
-      }));
-      return { services };
-  }
-  return { services: [] };
+    console.log(`[MOCK] Getting products for userId: ${userId}`);
+    if(serviceId) {
+        return { services: MOCK_SERVICES.filter(s => s.id === serviceId) };
+    }
+    return { services: MOCK_SERVICES };
 };
 
 export const getDomainsWHMCS = async (userId: string): Promise<{ domains: Domain[] }> => {
-  const data = await callWhmcsApi('GetClientsDomains', { clientid: userId });
-  if (data && data.domains && data.domains.domain) {
-      const domains: Domain[] = data.domains.domain.map((d: any) => ({
-          id: d.id,
-          domainName: d.domainname,
-          status: d.status,
-          registrationDate: d.regdate,
-          expiryDate: d.nextduedate,
-          registrar: d.registrar,
-          nameservers: [d.ns1, d.ns2, d.ns3, d.ns4].filter(Boolean)
-      }));
-      return { domains };
-  }
-  return { domains: [] };
+    console.log(`[MOCK] Getting domains for userId: ${userId}`);
+    return { domains: MOCK_DOMAINS };
 };
 
 export const getInvoicesWHMCS = async (userId: string, statusFilter?: InvoiceStatus): Promise<{ invoices: Invoice[] }> => {
-  const params: {userid: string, status?: InvoiceStatus} = { userid: userId };
-  if(statusFilter) params.status = statusFilter;
-  const data = await callWhmcsApi('GetInvoices', params);
-  
-  if (data && data.invoices && data.invoices.invoice) {
-      const invoices: Invoice[] = data.invoices.invoice.map((i: any) => ({
-          id: i.id,
-          invoiceNumber: i.invoicenum,
-          dateCreated: i.date,
-          dueDate: i.duedate,
-          total: i.total,
-          status: i.status,
-          items: i.items.item.map((item: any) => ({ description: item.description, amount: item.amount })),
-      }));
-      return { invoices };
-  }
-  return { invoices: [] };
+    console.log(`[MOCK] Getting invoices for userId: ${userId}`);
+    if (statusFilter) {
+        return { invoices: MOCK_INVOICES.filter(i => i.status === statusFilter) };
+    }
+    return { invoices: MOCK_INVOICES };
 };
 
 export const getTicketsWHMCS = async (userId: string, statusFilter: string = 'All Active'): Promise<{ tickets: Ticket[] }> => {
-    const data = await callWhmcsApi('GetTickets', { clientid: userId, status: statusFilter });
-    if(data && data.tickets && data.tickets.ticket) {
-        const tickets: Ticket[] = data.tickets.ticket.map((t: any) => ({
-            id: t.id,
-            ticketNumber: t.tid,
-            subject: t.subject,
-            department: t.deptname,
-            status: t.status,
-            lastUpdated: t.lastreply,
-            dateOpened: t.date,
-            priority: t.priority
-        }));
-        return { tickets };
-    }
-    return { tickets: [] };
+    console.log(`[MOCK] Getting tickets for userId: ${userId} with status: ${statusFilter}`);
+    return { tickets: Object.values(MOCK_TICKETS) };
 };
 
 export const getTicketByIdWHMCS = async (ticketId: string): Promise<{ ticket?: Ticket }> => {
-  const data = await callWhmcsApi('GetTicket', { ticketid: ticketId });
-  if(data && data.ticketid) {
-    const ticket: Ticket = {
-        id: data.ticketid,
-        ticketNumber: data.tid,
-        subject: data.subject,
-        department: data.deptname,
-        status: data.status,
-        lastUpdated: data.last_reply,
-        dateOpened: data.date,
-        priority: data.priority,
-        replies: data.replies.reply.map((r: any) => ({
-            id: r.replyid,
-            author: r.name, // Will be "Client Name" or "Staff Name"
-            message: r.message,
-            date: r.date,
-        }))
-    };
-    return { ticket };
-  }
-  return {};
+    console.log(`[MOCK] Getting ticket details for ticketId: ${ticketId}`);
+    return { ticket: MOCK_TICKETS[ticketId] };
 };
 
-export const openTicketWHMCS = async (ticketData: { clientid: string; deptname: string; subject: string; message: string; priority: 'Low' | 'Medium' | 'High'; }): Promise<{ result: 'success' | 'error'; message?: string; ticketId?: string; ticketNumber?: string; }> => {
-    const data = await callWhmcsApi('OpenTicket', { ...ticketData, deptname: ticketData.deptname });
-    return {
-        result: data.result,
-        message: data.message,
-        ticketId: data.id,
-        ticketNumber: data.tid
-    };
+export const openTicketWHMCS = async (ticketData: { subject: string }): Promise<{ result: 'success' | 'error'; message?: string; ticketId?: string; ticketNumber?: string; }> => {
+    console.log('[MOCK] Opening new ticket:', ticketData.subject);
+    const newId = (Object.keys(MOCK_TICKETS).length + 1).toString();
+    const newTicketNumber = `XYZ-${Math.floor(Math.random() * 90000) + 10000}`;
+    return { result: 'success', ticketId: newId, ticketNumber: newTicketNumber };
 }
 
 export const replyToTicketWHMCS = async (replyData: { ticketid: string; message: string; }): Promise<{ result: 'success' | 'error'; message?: string; reply?: TicketReply }> => {
-    const data = await callWhmcsApi('UpdateTicketReply', { ticketid: replyData.ticketid, message: replyData.message });
-    // This API call does not return the reply details, so we can't populate it here.
-    // The UI will need to re-fetch the ticket to see the new reply.
-    return { result: data.result, message: data.message };
+    console.log(`[MOCK] Replying to ticket ${replyData.ticketid}`);
+    const newReply: TicketReply = {
+        id: `r${Math.random()}`,
+        author: 'Client',
+        message: replyData.message,
+        date: format(new Date(), 'yyyy-MM-dd HH:mm'),
+    };
+    return { result: 'success', reply: newReply };
 }
 
 export const resendVerificationEmailWHMCS = async (userId: string): Promise<{ result: 'success' | 'error'; message?: string; }> => {
-    return callWhmcsApi('SendEmail', { id: userId, messagename: 'Client Email Address Verification' });
+    console.log(`[MOCK] Resending verification email for userId: ${userId}`);
+    return { result: 'success', message: 'Verification email resent successfully.' };
 }
 
 export const createSsoTokenWHMCS = async (params: { clientid?: string; service_id?: number; }): Promise<{ result: 'success' | 'error'; redirect_url?: string }> => {
-    const data = await callWhmcsApi('CreateSsoToken', params);
-    return { result: data.result, redirect_url: data.redirect_url };
+    console.log(`[MOCK] Creating SSO token for service ${params.service_id}`);
+    return { result: 'success', redirect_url: 'https://example.com/mock-cpanel-login' };
 }
 
 export const addFundsWHMCS = async (userId: string, amount: number, paymentMethodGateway: string): Promise<{ result: 'success' | 'error'; invoiceId?: string; paymentUrl?: string }> => {
-    const data = await callWhmcsApi('AddInvoicePayment', { invoiceid: '0', amount, gateway: paymentMethodGateway }); // This is a simplification; a specific funds invoice is better
-    // The above call is not ideal for funds. A better approach is to create a specific invoice.
-    // Let's use AddInvoice.
-    const invoiceData = await callWhmcsApi('AddInvoice', {
-        userid: userId,
-        status: 'Unpaid',
-        sendinvoice: 'true', // Send email to user
-        'itemdescription1': 'Add Funds Deposit',
-        'itemamount1': amount.toFixed(2),
-        'itemtaxed1': '0',
-        'paymentmethod': paymentMethodGateway
-    });
-    
-    if (invoiceData.result === 'success' && invoiceData.invoiceid) {
-         const whmcsUrl = process.env.NEXT_PUBLIC_WHMCS_API_URL?.replace('/includes/api.php', '');
-         return { 
-            result: 'success', 
-            invoiceId: invoiceData.invoiceid, 
-            paymentUrl: `${whmcsUrl}/viewinvoice.php?id=${invoiceData.invoiceid}` 
-        };
-    }
-    return { result: 'error', message: invoiceData.message || "Failed to create funds invoice." };
+    console.log(`[MOCK] Adding ${amount} funds for user ${userId} via ${paymentMethodGateway}`);
+    const newInvoiceId = (MOCK_INVOICES.length + 400).toString();
+    return { result: 'success', invoiceId: newInvoiceId, paymentUrl: `/billing` };
 }
 
 export const getProductGroupsWHMCS = async (): Promise<{ groups: ProductGroup[] }> => {
-    const data = await callWhmcsApi('GetProducts');
-    if (data && data.products && data.products.product) {
-        const groupMap = new Map<string, ProductGroup>();
-        data.products.product.forEach((p: any) => {
-            if (p.gid && !groupMap.has(p.gid)) {
-                groupMap.set(p.gid, {
-                    id: p.gid,
-                    name: p.groupname,
-                });
-            }
-        });
-        return { groups: Array.from(groupMap.values()) };
-    }
-    return { groups: [] };
+    console.log(`[MOCK] Getting product groups`);
+    return { groups: MOCK_PRODUCT_GROUPS };
 }
 
 export const getProductsWHMCS = async (gid?: string): Promise<{ products: Product[] }> => {
-    const data = await callWhmcsApi('GetProducts', { gid });
-    if (data && data.products && data.products.product) {
-        const products: Product[] = data.products.product.map((p: any) => ({
-            pid: p.pid,
-            gid: p.gid,
-            groupname: p.groupname,
-            type: p.type,
-            name: p.name,
-            description: p.description,
-            module: p.module,
-            paytype: p.paytype,
-            pricing: p.pricing,
-            // Logic to parse pricing needs to be added here.
-            parsedPricingCycles: Object.entries(p.pricing.USD)
-                .filter(([cycle, price]) => parseFloat(price as string) >= 0 && !cycle.includes('setupfee'))
-                .map(([cycle, price]) => ({
-                    cycleName: cycle.charAt(0).toUpperCase() + cycle.slice(1),
-                    displayPrice: `${p.pricing.USD.prefix}${price} ${p.pricing.USD.suffix}`,
-                    whmcsCycle: cycle,
-                })),
-        }));
-        return { products };
+    console.log(`[MOCK] Getting products for gid: ${gid || 'all'}`);
+    if (gid) {
+        return { products: MOCK_PRODUCTS.filter(p => p.gid === gid) };
     }
-    return { products: [] };
+    return { products: MOCK_PRODUCTS };
 }
 
 export const domainWhoisWHMCS = async (domain: string): Promise<{ result: DomainSearchResult }> => {
-    const data = await callWhmcsApi('DomainWhois', { domain });
-    return { result: {
-        domainName: domain,
-        status: data.status, // "available" or "unavailable"
-        pricing: data.pricing ? { register: data.pricing[1].register, period: '1' } : undefined
-    }};
+    console.log(`[MOCK] Checking domain: ${domain}`);
+    const isTaken = MOCK_DOMAINS.some(d => d.domainName.toLowerCase() === domain.toLowerCase());
+    return { 
+        result: {
+            domainName: domain,
+            status: isTaken ? 'unavailable' : 'available',
+            pricing: { register: '10.99', period: '1' }
+        }
+    };
 }
 
 export const addDomainOrderWHMCS = async (userId: string, config: DomainConfiguration, paymentMethod: string): Promise<{ result: 'success' | 'error'; orderid?: string; invoiceid?: string }> => {
-    const params = {
-        clientid: userId,
-        domain: config.domainName,
-        regperiod: config.registrationPeriod,
-        paymentmethod: paymentMethod,
-        dnsmanagement: config.dnsManagement ? '1' : '0',
-        emailforwarding: config.emailForwarding ? '1' : '0',
-        idprotection: config.idProtection ? '1' : '0',
-        ns1: config.nameservers.ns1,
-        ns2: config.nameservers.ns2,
-    };
-    const data = await callWhmcsApi('AddOrder', params);
-    return { result: data.result, orderid: data.orderid, invoiceid: data.invoiceid };
+    console.log(`[MOCK] Ordering domain ${config.domainName} for user ${userId}`);
+    return { result: 'success', orderid: 'ORD-555', invoiceid: 'INV-555' };
 }
 
 export const getPaymentMethodsWHMCS = async (): Promise<{ paymentMethods: PaymentMethod[] }> => {
-    const data = await callWhmcsApi('GetPaymentMethods');
-    if (data && data.paymentmethods && data.paymentmethods.paymentmethod) {
-        const methods: PaymentMethod[] = data.paymentmethods.paymentmethod.map((m: any) => ({
-            module: m.module,
-            displayName: m.displayname,
-        }));
-        return { paymentMethods: methods };
-    }
-    return { paymentMethods: [] };
+    console.log('[MOCK] Getting payment methods');
+    return { paymentMethods: MOCK_PAYMENT_METHODS };
+}
+
+// Keep the real API call function for easy switching back in the future
+export async function callWhmcsApi(action: string, params: Record<string, any> = {}): Promise<any> {
+    console.error("[DEV WARNING] callWhmcsApi should not be executed in mock mode. Check your logic.");
+    // In mock mode, we just return an error to prevent accidental live calls.
+    return { result: 'error', message: 'Function not implemented in mock mode.' };
 }
