@@ -132,7 +132,7 @@ export default function ManageDomainPage() {
         if (!response.ok) {
             throw new Error(data.message || "Failed to update nameservers.");
         }
-        toast({ title: "Success", description: "Nameservers have been updated successfully." });
+        toast({ title: "Success", description: "ameservers have been updated successfully." });
     } catch(error) {
         toast({ title: "Error", description: (error as Error).message, variant: "destructive" });
     } finally {
