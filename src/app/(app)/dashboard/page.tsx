@@ -58,6 +58,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [aiSummary, setAiSummary] = useState<SummarizeClientOutput | null>(null);
   const [isAiSummaryLoading, setIsAiSummaryLoading] = useState(true);
+  const [isSendingVerification, setIsSendingVerification] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -127,6 +128,30 @@ export default function DashboardPage() {
     }
   }, [user?.id, token, toast]);
 
+  const handleResendVerification = async () => {
+    if (!token) {
+        toast({ title: 'Error', description: 'Authentication token not found.', variant: 'destructive' });
+        return;
+    }
+    setIsSendingVerification(true);
+    try {
+        const response = await fetch('/api/auth/resend-verification', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to resend email.');
+        }
+        toast({ title: 'Email Sent', description: 'A new verification email has been sent to your address.' });
+    } catch (error) {
+        toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+        setIsSendingVerification(false);
+    }
+  };
+
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -166,7 +191,16 @@ export default function DashboardPage() {
         <Alert variant="default" className="bg-yellow-100 dark:bg-yellow-900/30 border-yellow-500/50 text-yellow-800 dark:text-yellow-200">
             <ShieldAlert className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
             <AlertTitle className="font-semibold">Please check your email and follow the link to verify your email address.</AlertTitle>
-            <Button variant="outline" size="sm" className="absolute top-3 right-3">Resend Verification Email</Button>
+            <Button 
+                variant="outline" 
+                size="sm" 
+                className="absolute top-3 right-3"
+                onClick={handleResendVerification}
+                disabled={isSendingVerification}
+            >
+                {isSendingVerification && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Resend Verification Email
+            </Button>
         </Alert>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

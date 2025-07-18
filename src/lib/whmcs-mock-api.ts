@@ -197,6 +197,13 @@ export const replyToTicketWHMCS = async (replyData: { ticketid: string; message:
     return { result: 'success', reply: newReply };
 }
 
+export const resendVerificationEmailWHMCS = async (userId: string): Promise<{ result: 'success' | 'error'; message?: string; }> => {
+    console.log(`[MOCK API] Resending verification email for user ${userId}`);
+    // Simulate a successful API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return { result: 'success', message: 'Verification email sent successfully from mock API.' };
+}
+
 export const createSsoTokenWHMCS = async (params: { clientid?: string; service_id?: number; }): Promise<{ result: 'success' | 'error'; redirect_url?: string }> => {
     console.log(`[MOCK API] Creating SSO token for service ${params.service_id}`);
     return { result: 'success', redirect_url: `https://your-cpanel-url.com/mock-sso-login/${Date.now()}`};
