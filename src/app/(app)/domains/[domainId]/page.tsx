@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   Loader2,
@@ -21,11 +22,14 @@ import {
   RefreshCw,
   PlusCircle,
   Lock,
-  Book,
+  BookUser, // Changed from Book
   MoveRight,
   ShieldAlert,
   Save,
-  Info
+  Info,
+  ShieldCheck,
+  ShieldClose,
+  List
 } from 'lucide-react';
 
 type Nameservers = {
@@ -36,8 +40,8 @@ type Nameservers = {
   ns5?: string;
 };
 
-const SidebarLink = ({ children, active = false }: { children: React.ReactNode, active?: boolean }) => (
-    <Button variant={active ? "secondary" : "ghost"} className="w-full justify-start">
+const SidebarLink = ({ children, active = false, onClick }: { children: React.ReactNode, active?: boolean, onClick?: () => void }) => (
+    <Button variant={active ? "secondary" : "ghost"} className="w-full justify-start gap-2" onClick={onClick}>
         {children}
     </Button>
 );
@@ -46,6 +50,13 @@ const ActionButton = ({ icon: Icon, children }: { icon: React.ElementType, child
     <Button variant="ghost" className="w-full justify-start gap-2 text-sm">
         <Icon className="h-4 w-4" /> {children}
     </Button>
+);
+
+const DetailItem = ({ label, value }: { label: string, value: React.ReactNode }) => (
+    <div>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="font-semibold">{value}</p>
+    </div>
 );
 
 export default function ManageDomainPage() {
@@ -60,6 +71,7 @@ export default function ManageDomainPage() {
   const [nsOption, setNsOption] = useState('custom');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     if (user?.id && domainId && token) {
@@ -104,9 +116,6 @@ export default function ManageDomainPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    
-    // In a real scenario, you might have different logic for 'default' nameservers
-    // For now, we'll just submit the values in the text boxes regardless of the radio button
     
     try {
         const response = await fetch(`/api/domains/${domainId}`, {
@@ -178,12 +187,18 @@ export default function ManageDomainPage() {
               <CardTitle className="text-base">Manage</CardTitle>
             </CardHeader>
             <CardContent className="p-2 space-y-1">
-              <SidebarLink>Overview</SidebarLink>
-              <SidebarLink>Auto Renew</SidebarLink>
-              <SidebarLink active>Nameservers</SidebarLink>
-              <SidebarLink>Registrar Lock</SidebarLink>
-              <SidebarLink>Addons</SidebarLink>
-              <SidebarLink>Push Domain</SidebarLink>
+              <SidebarLink active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>
+                <List className="h-4 w-4" /> Overview
+              </SidebarLink>
+              <SidebarLink active={activeTab === 'renew'} onClick={() => setActiveTab('renew')}>
+                Auto Renew
+              </SidebarLink>
+              <SidebarLink active={activeTab === 'nameservers'} onClick={() => setActiveTab('nameservers')}>
+                <Globe className="h-4 w-4" /> Nameservers
+              </SidebarLink>
+              <SidebarLink active={activeTab === 'lock'} onClick={() => setActiveTab('lock')}>
+                <Lock className="h-4 w-4" /> Registrar Lock
+              </SidebarLink>
             </CardContent>
           </Card>
           <Card>
@@ -200,60 +215,123 @@ export default function ManageDomainPage() {
 
         {/* Main Content */}
         <main className="lg:col-span-3">
-            <Card>
-                <form onSubmit={handleSubmit}>
-                    <CardHeader>
-                        <CardTitle>Nameservers</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                         <Alert>
-                           <Info className="h-4 w-4" />
-                           <AlertTitle>Heads up!</AlertTitle>
-                           <AlertDescription>
-                             You can change where your domain points to here. Please be aware changes can take up to 24 hours to propagate.
-                           </AlertDescription>
-                         </Alert>
-                         <RadioGroup value={nsOption} onValueChange={setNsOption}>
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="default" id="default-ns" />
-                                <Label htmlFor="default-ns">Use default nameservers</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="custom" id="custom-ns" />
-                                <Label htmlFor="custom-ns">Use custom nameservers (enter below)</Label>
-                            </div>
-                         </RadioGroup>
-                         <div className="space-y-4 pl-6 border-l-2 ml-2">
-                            <div>
-                                <Label htmlFor="ns1">Nameserver 1</Label>
-                                <Input id="ns1" value={nameservers.ns1} onChange={handleNsChange} disabled={nsOption === 'default'} />
-                            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="hidden">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="nameservers">Nameservers</TabsTrigger>
+                    <TabsTrigger value="renew">Auto Renew</TabsTrigger>
+                    <TabsTrigger value="lock">Registrar Lock</TabsTrigger>
+                </TabsList>
+                <TabsContent value="overview">
+                    <Card>
+                        <CardHeader><CardTitle>Overview</CardTitle></CardHeader>
+                        <CardContent className="space-y-6">
+                           <div className="grid md:grid-cols-2 gap-6">
+                               <div className="space-y-4">
+                                   <DetailItem label="Domain" value={<Link href={`http://${domain.domainName}`} target="_blank" className="text-primary hover:underline">{domain.domainName}</Link>} />
+                                   <DetailItem label="Registration Date" value={domain.registrationDate} />
+                                   <DetailItem label="Next Due Date" value={domain.expiryDate} />
+                                   <DetailItem label="Status" value={<Badge variant={domain.status === 'Active' ? 'default' : 'secondary'} className={domain.status === 'Active' ? 'bg-green-500 hover:bg-green-600' : ''}>{domain.status}</Badge>} />
+                                   <DetailItem label="SSL Status" value={
+                                       <div className="flex items-center gap-2">
+                                           {domain.sslStatus === 'Active' ? <ShieldCheck className="h-4 w-4 text-green-500" /> : <ShieldClose className="h-4 w-4 text-destructive" />}
+                                           <span>{domain.sslStatus}</span>
+                                       </div>
+                                   } />
+                               </div>
+                               <div className="space-y-4">
+                                   <DetailItem label="First Payment Amount" value={domain.firstPaymentAmount} />
+                                   <DetailItem label="Recurring Amount" value={`${domain.recurringAmount} Every 1 Year/s`} />
+                                   <DetailItem label="Payment Method" value={domain.paymentMethod} />
+                               </div>
+                           </div>
+                           <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                                <Info className="h-4 w-4 !text-blue-600" />
+                                <AlertTitle className="text-blue-800 dark:text-blue-300">Information</AlertTitle>
+                                <AlertDescription className="text-blue-700 dark:text-blue-400">
+                                    Your custom HTML output goes here...
+                                </AlertDescription>
+                            </Alert>
                              <div>
-                                <Label htmlFor="ns2">Nameserver 2</Label>
-                                <Input id="ns2" value={nameservers.ns2} onChange={handleNsChange} disabled={nsOption === 'default'} />
+                                <h3 className="text-lg font-semibold mb-2">What would you like to do today?</h3>
+                                <ul className="list-disc list-inside space-y-1 text-primary">
+                                    <li><button onClick={() => setActiveTab('nameservers')} className="hover:underline">Change the nameservers your domain points to</button></li>
+                                    <li><button onClick={() => setActiveTab('lock')} className="hover:underline">Change the registrar lock status for your domain</button></li>
+                                    <li><button onClick={() => toast({title: "Action", description: "Renew action clicked"})} className="hover:underline">Renew Domain</button></li>
+                                </ul>
                             </div>
-                             <div>
-                                <Label htmlFor="ns3">Nameserver 3</Label>
-                                <Input id="ns3" value={nameservers.ns3} onChange={handleNsChange} disabled={nsOption === 'default'} />
-                            </div>
-                             <div>
-                                <Label htmlFor="ns4">Nameserver 4</Label>
-                                <Input id="ns4" value={nameservers.ns4} onChange={handleNsChange} disabled={nsOption === 'default'} />
-                            </div>
-                             <div>
-                                <Label htmlFor="ns5">Nameserver 5</Label>
-                                <Input id="ns5" value={nameservers.ns5} onChange={handleNsChange} disabled={nsOption === 'default'} />
-                            </div>
-                         </div>
-                    </CardContent>
-                    <CardFooter>
-                        <Button type="submit" disabled={isSaving}>
-                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                            Change Nameservers
-                        </Button>
-                    </CardFooter>
-                </form>
-            </Card>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="nameservers">
+                    <Card>
+                        <form onSubmit={handleSubmit}>
+                            <CardHeader>
+                                <CardTitle>Nameservers</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <Alert>
+                                <Info className="h-4 w-4" />
+                                <AlertTitle>Heads up!</AlertTitle>
+                                <AlertDescription>
+                                    You can change where your domain points to here. Please be aware changes can take up to 24 hours to propagate.
+                                </AlertDescription>
+                                </Alert>
+                                <RadioGroup value={nsOption} onValueChange={setNsOption}>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="default" id="default-ns" />
+                                        <Label htmlFor="default-ns">Use default nameservers</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="custom" id="custom-ns" />
+                                        <Label htmlFor="custom-ns">Use custom nameservers (enter below)</Label>
+                                    </div>
+                                </RadioGroup>
+                                <div className="space-y-4 pl-6 border-l-2 ml-2">
+                                    <div>
+                                        <Label htmlFor="ns1">Nameserver 1</Label>
+                                        <Input id="ns1" value={nameservers.ns1} onChange={handleNsChange} disabled={nsOption === 'default'} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="ns2">Nameserver 2</Label>
+                                        <Input id="ns2" value={nameservers.ns2} onChange={handleNsChange} disabled={nsOption === 'default'} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="ns3">Nameserver 3</Label>
+                                        <Input id="ns3" value={nameservers.ns3} onChange={handleNsChange} disabled={nsOption === 'default'} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="ns4">Nameserver 4</Label>
+                                        <Input id="ns4" value={nameservers.ns4} onChange={handleNsChange} disabled={nsOption === 'default'} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="ns5">Nameserver 5</Label>
+                                        <Input id="ns5" value={nameservers.ns5} onChange={handleNsChange} disabled={nsOption === 'default'} />
+                                    </div>
+                                </div>
+                            </CardContent>
+                            <CardFooter>
+                                <Button type="submit" disabled={isSaving}>
+                                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                    Change Nameservers
+                                </Button>
+                            </CardFooter>
+                        </form>
+                    </Card>
+                </TabsContent>
+                 <TabsContent value="renew">
+                    <Card>
+                        <CardHeader><CardTitle>Auto Renew</CardTitle></CardHeader>
+                        <CardContent><p>Auto Renew settings will be here.</p></CardContent>
+                    </Card>
+                 </TabsContent>
+                 <TabsContent value="lock">
+                    <Card>
+                        <CardHeader><CardTitle>Registrar Lock</CardTitle></CardHeader>
+                        <CardContent><p>Registrar Lock settings will be here.</p></CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
         </main>
       </div>
     </div>

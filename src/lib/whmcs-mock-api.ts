@@ -1,4 +1,5 @@
 
+
 import type { User, Service, Domain, Invoice, Ticket, TicketReply, InvoiceStatus, TicketStatus, ServiceStatus, DomainStatus, ProductGroup, Product, ProductPricing, PricingCycleDetail, DomainSearchResult, DomainConfiguration, PaymentMethod } from '@/types';
 import { format, subDays, addDays, addMonths } from 'date-fns';
 
@@ -32,9 +33,9 @@ const MOCK_SERVICES: Service[] = [
 ];
 
 const MOCK_DOMAINS: Domain[] = [
-    { id: '201', domainName: 'mycoolwebsite.com', status: 'Active', registrationDate: format(subDays(new Date(), 400), 'yyyy-MM-dd'), expiryDate: format(addDays(new Date(), 300), 'yyyy-MM-dd'), registrar: 'Enom', nameservers: ['ns1.snbdhost.com', 'ns2.snbdhost.com'] },
-    { id: '202', domainName: 'anotherdomain.net', status: 'Expired', registrationDate: format(subDays(new Date(), 800), 'yyyy-MM-dd'), expiryDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), registrar: 'Namecheap', nameservers: ['dns1.namecheap.com', 'dns2.namecheap.com'] },
-    { id: '203', domainName: 'newproject.dev', status: 'Pending', registrationDate: format(new Date(), 'yyyy-MM-dd'), expiryDate: format(addDays(new Date(), 365), 'yyyy-MM-dd'), registrar: 'GoDaddy', nameservers: ['ns1.godaddy.com', 'ns2.godaddy.com', 'ns3.godaddy.com'] },
+    { id: '201', domainName: 'mycoolwebsite.com', status: 'Active', registrationDate: format(subDays(new Date(), 400), 'yyyy-MM-dd'), expiryDate: format(addDays(new Date(), 300), 'yyyy-MM-dd'), registrar: 'Enom', nameservers: ['ns1.snbdhost.com', 'ns2.snbdhost.com'], firstPaymentAmount: '৳1,547.00 BDT', recurringAmount: '৳1,547.00 BDT', paymentMethod: 'bKash Merchant', sslStatus: 'Active' },
+    { id: '202', domainName: 'anotherdomain.net', status: 'Expired', registrationDate: format(subDays(new Date(), 800), 'yyyy-MM-dd'), expiryDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), registrar: 'Namecheap', nameservers: ['dns1.namecheap.com', 'dns2.namecheap.com'], firstPaymentAmount: '৳1,200.00 BDT', recurringAmount: '৳1,200.00 BDT', paymentMethod: 'Stripe', sslStatus: 'No SSL Detected'},
+    { id: '203', domainName: 'newproject.dev', status: 'Pending', registrationDate: format(new Date(), 'yyyy-MM-dd'), expiryDate: format(addDays(new Date(), 365), 'yyyy-MM-dd'), registrar: 'GoDaddy', nameservers: ['ns1.godaddy.com', 'ns2.godaddy.com', 'ns3.godaddy.com'], firstPaymentAmount: '৳0.00 BDT', recurringAmount: '৳999.00 BDT', paymentMethod: 'PayPal', sslStatus: 'No SSL Detected' },
 ];
 
 const MOCK_INVOICES: Invoice[] = [

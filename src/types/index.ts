@@ -2,6 +2,7 @@
 
 
 
+
 export interface User {
   id: string;
   email: string;
@@ -56,6 +57,11 @@ export interface Domain {
   expiryDate: string;
   registrar: string;
   nameservers: string[];
+  // New fields for Overview page
+  firstPaymentAmount: string;
+  recurringAmount: string;
+  paymentMethod: string;
+  sslStatus: 'Active' | 'No SSL Detected';
 }
 
 export type InvoiceStatus = 'Paid' | 'Unpaid' | 'Cancelled' | 'Overdue' | 'Refunded' | 'Collections';
