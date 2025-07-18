@@ -302,7 +302,7 @@ export default function DashboardPage() {
                         </CardHeader>
                         <CardContent className="flex items-center gap-6">
                             <div className="w-1/3">
-                               <Image src="https://assets.sitejet.io/images/temp/logo-sitejet-500.png" alt="Sitejet Logo" width={500} height={150} />
+                               <Image src="https://sitejet.us/public/images/logo-1.png" alt="Sitejet Logo" width={500} height={150} />
                             </div>
                             <div className="flex-1">
                                 <p className="text-muted-foreground mb-4">You have {sitejetServices.length} service(s) with our powerful Sitejet website builder. Select a site below to start editing.</p>
@@ -387,3 +387,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
