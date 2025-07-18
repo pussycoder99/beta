@@ -34,7 +34,7 @@ const MOCK_SERVICES: Service[] = [
 const MOCK_DOMAINS: Domain[] = [
     { id: '201', domainName: 'mycoolwebsite.com', status: 'Active', registrationDate: format(subDays(new Date(), 400), 'yyyy-MM-dd'), expiryDate: format(addDays(new Date(), 300), 'yyyy-MM-dd'), registrar: 'Enom', nameservers: ['ns1.snbdhost.com', 'ns2.snbdhost.com'] },
     { id: '202', domainName: 'anotherdomain.net', status: 'Expired', registrationDate: format(subDays(new Date(), 800), 'yyyy-MM-dd'), expiryDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'), registrar: 'Namecheap', nameservers: ['dns1.namecheap.com', 'dns2.namecheap.com'] },
-    { id: '203', domainName: 'newproject.dev', status: 'Pending', registrationDate: format(new Date(), 'yyyy-MM-dd'), expiryDate: format(addDays(new Date(), 365), 'yyyy-MM-dd'), registrar: 'GoDaddy', nameservers: [] },
+    { id: '203', domainName: 'newproject.dev', status: 'Pending', registrationDate: format(new Date(), 'yyyy-MM-dd'), expiryDate: format(addDays(new Date(), 365), 'yyyy-MM-dd'), registrar: 'GoDaddy', nameservers: ['ns1.godaddy.com', 'ns2.godaddy.com', 'ns3.godaddy.com'] },
 ];
 
 const MOCK_INVOICES: Invoice[] = [
@@ -111,6 +111,22 @@ export const getDomainsWHMCS = async (userId: string): Promise<{ domains: Domain
     console.log(`[MOCK] Getting domains for userId: ${userId}`);
     return { domains: MOCK_DOMAINS };
 };
+
+export const getDomainDetailsWHMCS = async (domainId: string): Promise<{ domain?: Domain }> => {
+    console.log(`[MOCK] Getting domain details for domainId: ${domainId}`);
+    const domain = MOCK_DOMAINS.find(d => d.id === domainId);
+    return { domain };
+}
+
+export const updateDomainNameserversWHMCS = async (domainId: string, nameservers: { [key: string]: string | undefined }): Promise<{ result: 'success' | 'error'; message?: string }> => {
+    console.log(`[MOCK] Updating nameservers for domainId ${domainId} with`, nameservers);
+    const domainIndex = MOCK_DOMAINS.findIndex(d => d.id === domainId);
+    if (domainIndex > -1) {
+        MOCK_DOMAINS[domainIndex].nameservers = Object.values(nameservers).filter(ns => ns) as string[];
+        return { result: 'success' };
+    }
+    return { result: 'error', message: 'Domain not found in mock data.' };
+}
 
 export const getInvoicesWHMCS = async (userId: string, statusFilter?: InvoiceStatus): Promise<{ invoices: Invoice[] }> => {
     console.log(`[MOCK] Getting invoices for userId: ${userId}`);

@@ -1,6 +1,7 @@
 
 
 
+
 export interface User {
   id: string;
   email: string;
@@ -169,4 +170,3 @@ export interface PaymentMethod {
   module: string;
   displayName: string;
 }
-    

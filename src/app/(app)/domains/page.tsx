@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Database, Globe, PlusCircle, RefreshCw, Settings2, Loader2 } from 'lucide-react';
+import { Database, Globe, PlusCircle, RefreshCw, Settings2, Loader2, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
@@ -127,7 +127,7 @@ export default function DomainsPage() {
                   <TableHead>Registrar</TableHead>
                   <TableHead>Expiry Date</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Manage</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -138,17 +138,11 @@ export default function DomainsPage() {
                     <TableCell>{domain.expiryDate}</TableCell>
                     <TableCell><StatusBadge status={domain.status} /></TableCell>
                     <TableCell className="text-right space-x-1">
-                      <Button variant="ghost" size="icon" title="Manage DNS" onClick={() => handleAction(domain.id, 'Manage DNS')}>
-                        <Database className="h-4 w-4" />
+                      <Button asChild>
+                         <Link href={`/domains/${domain.id}`}>
+                            <Wrench className="mr-2 h-4 w-4"/> Manage
+                         </Link>
                       </Button>
-                      <Button variant="ghost" size="icon" title="Update Nameservers" onClick={() => handleAction(domain.id, 'Update Nameservers')}>
-                        <Settings2 className="h-4 w-4" />
-                      </Button>
-                      {domain.status !== 'Expired' && domain.status !== 'Transferred Away' && (
-                        <Button variant="ghost" size="icon" title="Renew Domain" onClick={() => handleAction(domain.id, 'Renew Domain')}>
-                          <RefreshCw className="h-4 w-4" />
-                        </Button>
-                      )}
                     </TableCell>
                   </TableRow>
                 ))}
