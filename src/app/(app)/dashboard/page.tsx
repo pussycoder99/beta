@@ -29,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { summarizeClient, type SummarizeClientOutput } from '@/ai/flows/summarize-client-flow';
+import Image from 'next/image';
 
 interface DashboardStats {
   activeServices: number;
@@ -151,6 +152,16 @@ export default function DashboardPage() {
     }
   };
 
+  const handleEditWithSitejet = (service: Service) => {
+    toast({
+        title: 'Opening Sitejet Editor...',
+        description: `You would now be redirected to the Sitejet editor for ${service.domain}. (This is a mock action)`
+    });
+    // In a real app, you would generate a SSO link via API and redirect:
+    // const ssoUrl = await getSitejetSsoUrl(service.id);
+    // window.open(ssoUrl, '_blank');
+  };
+
 
   if (isLoading) {
     return (
@@ -180,6 +191,8 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const sitejetServices = activeServices.filter(s => s.name.toLowerCase().includes('hosting'));
 
   return (
     <div className="space-y-6">
@@ -243,7 +256,7 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent className="space-y-2">
                          <Link href="/services/order" className="flex items-center gap-2 text-sm hover:text-primary"><ShoppingCart/> Order New Services</Link>
-                         <Link href="/domains" className="flex items-center gap-2 text-sm hover:text-primary"><Globe/> Register a New Domain</Link>
+                         <Link href="/domains/register" className="flex items-center gap-2 text-sm hover:text-primary"><Globe/> Register a New Domain</Link>
                          <button onClick={logout} className="flex items-center gap-2 text-sm hover:text-primary w-full"><LogOut/> Logout</button>
                     </CardContent>
                 </Card>
@@ -282,31 +295,28 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg">Sitejet Builder</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex items-center gap-6">
-                        <div className="w-1/3">
-                           <img src="https://assets.sitejet.io/images/temp/logo-sitejet-500.png" alt="Sitejet Logo" />
-                        </div>
-                        <div className="flex-1 flex items-center gap-2">
-                             <Label htmlFor="sitejet-website" className="whitespace-nowrap">Choose a website to manage:</Label>
-                             <Select defaultValue={activeServices.length > 0 ? activeServices[0].domain : undefined}>
-                                <SelectTrigger id="sitejet-website">
-                                    <SelectValue placeholder="Select a site" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {activeServices.map(service => (
-                                        <SelectItem key={service.id} value={service.domain || service.id}>{service.domain}</SelectItem>
-                                    ))}
-                                    {activeServices.length === 0 && <SelectItem value="no-sites" disabled>No websites found</SelectItem>}
-                                </SelectContent>
-                             </Select>
-                             <Button>Edit Website</Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                {sitejetServices.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Sitejet Builder</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex items-center gap-6">
+                            <div className="w-1/3">
+                               <Image src="https://assets.sitejet.io/images/temp/logo-sitejet-500.png" alt="Sitejet Logo" width={500} height={150} />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-muted-foreground mb-4">You have {sitejetServices.length} service(s) with our powerful Sitejet website builder. Select a site below to start editing.</p>
+                                {sitejetServices.map(service => (
+                                    <div key={service.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
+                                        <p className="font-semibold">{service.domain}</p>
+                                        <Button onClick={() => handleEditWithSitejet(service)}>Edit with Sitejet</Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
@@ -315,8 +325,8 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         {activeServices.length > 0 ? (
-                            activeServices.slice(0, 1).map(service => (
-                                <div key={service.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
+                            activeServices.slice(0, 3).map(service => (
+                                <div key={service.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-md mb-2 last:mb-0">
                                     <div className="flex items-center gap-3">
                                         <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">Active</span>
                                         <div>
@@ -325,7 +335,9 @@ export default function DashboardPage() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Button variant="secondary">Edit with Sitejet</Button>
+                                        {service.name.toLowerCase().includes('hosting') && (
+                                            <Button variant="secondary" onClick={() => handleEditWithSitejet(service)}>Edit with Sitejet</Button>
+                                        )}
                                         <Button variant="outline">Log in to cPanel</Button>
                                         <Button variant="outline" asChild><Link href={`/services/${service.id}`}>View Details</Link></Button>
                                     </div>
@@ -334,8 +346,8 @@ export default function DashboardPage() {
                         ) : (
                             <p className="text-muted-foreground text-sm">No active services found.</p>
                         )}
-                        {activeServices.length > 1 && (
-                             <Link href="/services" className="text-sm text-primary hover:underline mt-2 inline-block">View More...</Link>
+                        {activeServices.length > 3 && (
+                             <Link href="/services" className="text-sm text-primary hover:underline mt-2 inline-block">View All Services...</Link>
                         )}
                     </CardContent>
                 </Card>

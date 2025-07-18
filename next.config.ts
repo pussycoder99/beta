@@ -21,6 +21,12 @@ const nextConfig: NextConfig = {
         hostname: 'snbdhost.com',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'assets.sitejet.io',
+        port: '',
+        pathname: '/**',
       }
     ],
   },
