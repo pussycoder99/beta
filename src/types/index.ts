@@ -3,6 +3,7 @@
 
 
 
+
 export interface User {
   id: string;
   email: string;
@@ -62,6 +63,8 @@ export interface Domain {
   recurringAmount: string;
   paymentMethod: string;
   sslStatus: 'Active' | 'No SSL Detected';
+  registrarLock: boolean;
+  registrarLockStatus: 'Locked' | 'Unlocked';
 }
 
 export type InvoiceStatus = 'Paid' | 'Unpaid' | 'Cancelled' | 'Overdue' | 'Refunded' | 'Collections';

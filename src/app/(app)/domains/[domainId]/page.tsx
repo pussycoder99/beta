@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
   ArrowLeft,
   Loader2,
@@ -23,7 +24,7 @@ import {
   RefreshCw,
   PlusCircle,
   Lock,
-  BookUser, // Changed from Book
+  BookUser, 
   MoveRight,
   ShieldAlert,
   Save,
@@ -70,6 +71,7 @@ export default function ManageDomainPage() {
   const [domain, setDomain] = useState<Domain | null>(null);
   const [nameservers, setNameservers] = useState<Nameservers>({ ns1: '', ns2: '' });
   const [nsOption, setNsOption] = useState('custom');
+  const [registrarLock, setRegistrarLock] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -97,6 +99,7 @@ export default function ManageDomainPage() {
             ns4: currentNs[3] || '',
             ns5: currentNs[4] || '',
           });
+          setRegistrarLock(data.domain.registrarLock);
         } else {
           toast({ title: "Error", description: "Domain not found.", variant: "destructive" });
           router.push('/domains');
@@ -114,7 +117,7 @@ export default function ManageDomainPage() {
     setNameservers(prev => ({ ...prev, [id]: value }));
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleNameserverSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     
@@ -136,6 +139,31 @@ export default function ManageDomainPage() {
         setIsSaving(false);
     }
   };
+  
+  const handleLockStatusChange = async () => {
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/domains/${domainId}/lock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ lockstatus: !registrarLock })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update lock status.');
+      }
+      setRegistrarLock(!registrarLock);
+      // Update domain object locally to reflect new status
+      if (domain) {
+        setDomain({ ...domain, registrarLock: !registrarLock, registrarLockStatus: data.newStatus });
+      }
+      toast({ title: "Success", description: "Registrar Lock status has been updated." });
+    } catch (error) {
+       toast({ title: "Error", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
 
   if (isLoading) {
@@ -266,7 +294,7 @@ export default function ManageDomainPage() {
                 </TabsContent>
                 <TabsContent value="nameservers">
                     <Card>
-                        <form onSubmit={handleSubmit}>
+                        <form onSubmit={handleNameserverSubmit}>
                             <CardHeader>
                                 <CardTitle>Nameservers</CardTitle>
                             </CardHeader>
@@ -328,8 +356,39 @@ export default function ManageDomainPage() {
                  </TabsContent>
                  <TabsContent value="lock">
                     <Card>
-                        <CardHeader><CardTitle>Registrar Lock</CardTitle></CardHeader>
-                        <CardContent><p>Registrar Lock settings will be here.</p></CardContent>
+                        <CardHeader>
+                          <CardTitle>Registrar Lock</CardTitle>
+                           <CardDescription>
+                                Keep your domain secure with a registrar lock. This prevents unauthorized transfers.
+                           </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <Alert>
+                                <ShieldAlert className="h-4 w-4" />
+                                <AlertTitle>Warning!</AlertTitle>
+                                <AlertDescription>
+                                    You must disable the registrar lock to transfer your domain to another registrar.
+                                </AlertDescription>
+                            </Alert>
+                             <div className="flex items-center space-x-2 rounded-lg border p-4">
+                                <Switch
+                                    id="registrar-lock-switch"
+                                    checked={registrarLock}
+                                    onCheckedChange={handleLockStatusChange}
+                                    disabled={isSaving}
+                                />
+                                <Label htmlFor="registrar-lock-switch" className="flex-1">
+                                    <span className="font-semibold">Registrar Lock Status:</span> 
+                                    <span className={`ml-2 font-bold ${registrarLock ? 'text-green-600' : 'text-destructive'}`}>{domain.registrarLockStatus}</span>
+                                </Label>
+                                {isSaving && <Loader2 className="h-5 w-5 animate-spin" />}
+                            </div>
+                        </CardContent>
+                        <CardFooter>
+                            <p className="text-sm text-muted-foreground">
+                                If the lock is enabled, your domain is protected from unauthorized transfers.
+                            </p>
+                        </CardFooter>
                     </Card>
                 </TabsContent>
             </Tabs>
